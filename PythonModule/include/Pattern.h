@@ -1,0 +1,178 @@
+#pragma once
+
+#include "Types.h"
+#include "Logger.h"
+#include "Utils.h"
+
+#include <iostream>
+
+class Pattern
+{
+	DISABLE_COPY_ASSIGN_MOVE(Pattern)
+
+	static constexpr std::size_t BLOCK_SIZE = 16384;
+
+public:
+	static constexpr PatternType OFFSET = 2;
+	static constexpr PatternType LEN_IDX = 0;
+	static constexpr PatternType SUPP_IDX = 1;
+	static constexpr PatternType DATA_IDX = 2;
+
+public:
+	Pattern() :
+		m_nextIdx(0),
+		m_block(0),
+		m_patternCnt(0),
+		m_mem(),
+		m_pEndPtr(nullptr)
+	{
+		allocNewPatternBlock();
+	}
+
+	~Pattern()
+	{
+		for (std::size_t i = 0; i < m_block; i++)
+			delete[] m_mem[i];
+	}
+
+	template<typename T>
+	class iterator
+	{
+	DISABLE_COPY_ASSIGN_MOVE(iterator)
+	public:
+		using ValueType = T;
+		using Reference = T&;
+		using Pointer = T*;
+
+
+
+		explicit iterator(std::vector<PatternType*> mem, const std::size_t& maxBlocks, PatternType* pItr = nullptr) :
+			m_idx(0),
+			m_block(0),
+			m_maxBlocks(maxBlocks),
+			m_mem(mem),
+			m_pItr(pItr)
+		{
+			if (m_pItr == nullptr)
+				m_pItr = m_mem[m_block];
+		}
+
+		bool operator != (const iterator& other) const { return m_pItr != other.m_pItr; }
+		iterator& operator++()
+		{
+			m_idx += m_pItr[LEN_IDX] + OFFSET;
+
+			if ((m_idx >= BLOCK_SIZE) || (m_mem[m_block][m_idx] == 0 && (m_block + 1) < m_maxBlocks))
+			{
+				m_block++;
+				m_idx = 0;
+			}
+
+			m_pItr = m_mem[m_block] + m_idx;
+
+			return *this;
+		}
+
+		Pointer operator*() const
+		{
+			return m_pItr;
+		}
+
+		Pointer operator->() const
+		{
+			return m_pItr;
+		}
+
+	private:
+		std::size_t m_idx;
+		std::size_t m_block;
+		std::size_t m_maxBlocks;
+		std::vector<PatternType*> m_mem;
+		PatternType* m_pItr;
+	};
+
+	using Iterator = iterator<PatternType>;
+	using ConstIterator = iterator<const PatternType>;
+
+	const std::size_t& GetCount() const
+	{
+		return m_patternCnt;
+	}
+
+	Iterator begin()
+	{
+		return Iterator(m_mem, m_block);
+	}
+
+	Iterator end()
+	{
+		return Iterator(m_mem, m_block, m_pEndPtr);
+	}
+
+	Iterator begin() const
+	{
+		return Iterator(m_mem, m_block);
+	}
+
+	Iterator end() const
+	{
+		return Iterator(m_mem, m_block, m_pEndPtr);
+	}
+
+	void AddPattern(const PatternType& patternLength, const Support& support, PatternType* pData)
+	{
+		PatternType* pPattern = getNextPattern(patternLength);
+
+		pPattern[LEN_IDX] = patternLength; // Set pattern length
+		pPattern[SUPP_IDX] = support; // Set pattern support
+		// Set pattern data
+		std::memcpy(pPattern + OFFSET, pData, patternLength * sizeof(PatternType));
+
+#ifdef DEBUG
+		LOG_DEBUG << "Adding Pattern: " << std::flush;
+		for (PatternType i = 0; i < patternLength; i++)
+			LOG_DEBUG << (char)pData[i] << " ";
+		LOG_DEBUG << "(" << support << ")" << std::endl;
+#endif
+
+		m_patternCnt++;
+	}
+
+private:
+	PatternType* getNextPattern(const PatternType& length)
+	{
+		if (m_nextIdx + (length + OFFSET) >= BLOCK_SIZE)
+			allocNewPatternBlock();
+
+		PatternType* pPtr = m_mem[m_block - 1] + m_nextIdx;
+		m_nextIdx += length + OFFSET;
+
+		m_pEndPtr = m_mem[m_block - 1] + m_nextIdx;
+
+		return pPtr;
+	}
+
+	void allocNewPatternBlock()
+	{
+#ifdef PATTERN_VERBOSE
+		LOG_DEBUG << "Allocating new Pattern Block ... " << std::flush;
+#endif
+
+		m_mem.push_back(new PatternType[BLOCK_SIZE]());
+
+		m_block++;
+		m_nextIdx = 0;
+
+#ifdef PATTERN_VERBOSE
+		LOG_DEBUG << "Done" << std::endl;
+#endif
+	}
+
+private:
+	std::size_t m_nextIdx;
+	std::size_t m_block;
+	std::size_t m_patternCnt;
+	std::vector<PatternType*> m_mem;
+	PatternType* m_pEndPtr;
+};
+
