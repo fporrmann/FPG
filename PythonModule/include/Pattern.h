@@ -126,6 +126,11 @@ public:
 		return m_patternCnt;
 	}
 
+	bool Empty() const
+	{
+		return m_patternCnt == 0;
+	}
+
 	Iterator begin()
 	{
 		return Iterator(m_mem, m_block);

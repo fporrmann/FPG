@@ -78,10 +78,10 @@ int main(int argc, char** argv)
 	std::cout << "Memory Used: " << GetMemString() << std::endl;
 
 	std::vector<const PatternType*> processed;
-	PostProcessing(pPattern, transactions.size(), fp.GetItemCount(), atoi(argv[2]), 20, fp.GetId2Item(), processed);
+	//	PostProcessing(pPattern, transactions.size(), fp.GetItemCount(), atoi(argv[2]), 20, fp.GetId2Item(), processed);
 
 	std::vector<PatternPair> closed;
-	ClosedDetection(fp.GetItemCount(), fp.GetId2Item(), processed, closed);
+	ClosedDetection(fp, pPattern, closed);
 
 	t.Stop();
 	std::cout << " ==== Full Runtime: " << t << " ====" << std::endl;

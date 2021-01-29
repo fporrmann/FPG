@@ -272,6 +272,15 @@ public:
 		return m_pId2Item;
 	}
 
+	std::size_t GetPatternCount() const
+	{
+		std::size_t cnt = 0;
+		for (std::size_t i = 0; i < m_tree->cnt; i++)
+			cnt += m_pPattern[i].GetCount();
+
+		return cnt;
+	}
+
 	const Pattern* Growth()
 	{
 		Timer t;
@@ -279,10 +288,7 @@ public:
 		if (!growthTop(m_tree)) return nullptr;
 
 		t.Stop();
-		std::size_t cnt = 0;
-		for (std::size_t i = 0; i < m_tree->cnt; i++)
-			cnt += m_pPattern[i].GetCount();
-		LOG_INFO << "\x1B[31mRuntime:\x1B[0m " << t + m_initTime << " - Frequent Item-Sets: " << cnt << std::endl;
+		LOG_INFO << "\x1B[31mRuntime:\x1B[0m " << t + m_initTime << " - Frequent Item-Sets: " << GetPatternCount() << std::endl;
 		return m_pPattern;
 	}
 
@@ -855,9 +861,11 @@ void PostProcessing(const Pattern* pPattern, const std::size_t& maxC, const std:
 	LOG_INFO << "Reduction: " << cnt << " -> " << res.size() << std::endl;
 }
 
-void ClosedDetection(const std::size_t& itemCount, const ItemC* pId2Item, const std::vector<const PatternType*>& itemSets, std::vector<PatternPair>& closed)
+void ClosedDetection(const FPGrowth& fp, const Pattern* pPattern, std::vector<PatternPair>& closed)
 {
-	if (itemSets.empty())
+	const std::size_t itemCount = fp.GetItemCount();
+	const ItemC* pId2Item       = fp.GetId2Item();
+	if (fp.GetPatternCount() == 0)
 	{
 		LOG_VERBOSE << "No itemsets provided, skipping Closed Detection" << std::endl;
 		return;
@@ -878,103 +886,106 @@ void ClosedDetection(const std::size_t& itemCount, const ItemC* pId2Item, const 
 	ItemID base = ITEM_ID_MAX;
 	int32_t k   = 0;
 
-	for (const PatternType* pp : itemSets)
+	for (int64_t patI = itemCount - 1; patI > -1; patI--)
 	{
+		for (const PatternType* pp : pPattern[patI])
+		{
 #ifdef WITH_SIG_TERM
-		if (sigAborted()) throw(FPGException("CTRL-C abort"));
+			if (sigAborted()) throw(FPGException("CTRL-C abort"));
 #endif
-		int32_t pfExtCnt = 0;
-		bool skip        = false;
+			int32_t pfExtCnt = 0;
+			bool skip        = false;
 
-		if (base != pp[Pattern::DATA_IDX])
-		{
-			cd.Remove(k);
-			base = pp[Pattern::DATA_IDX];
-			std::memset(pAdded, 0, itemCount * sizeof(bool));
-			k = 0;
-		}
-
-		for (int32_t i = 0; i < k; i++)
-		{
-			// TODO: Probably can start at 1 here
-			if (pItems[i] != (pp[Pattern::DATA_IDX + i] & 0xFFFFFFFF))
+			if (base != pp[Pattern::DATA_IDX])
 			{
-				for (int32_t j = i; j < k; j++)
-				{
-					pAdded[pItems[j]] = false;
-					cd.Remove(1);
-				}
-
-				k = i;
-				break;
+				cd.Remove(k);
+				base = pp[Pattern::DATA_IDX];
+				std::memset(pAdded, 0, itemCount * sizeof(bool));
+				k = 0;
 			}
-		}
 
-		for (PatternType p = 0; p < pp[Pattern::LEN_IDX]; p++)
-		{
-			PatternType i = pp[Pattern::DATA_IDX + p];
-			Support supp  = i >> 32;
-			ItemID item   = i & 0xFFFFFFFF;
-			if (supp == 0)
-				pPfExt[pfExtCnt++] = item;
-			else if (!pAdded[item])
+			for (int32_t i = 0; i < k; i++)
 			{
-				if (cd.Add2(item, supp) > 0)
+				// TODO: Probably can start at 1 here
+				if (pItems[i] != (pp[Pattern::DATA_IDX + i] & 0xFFFFFFFF))
 				{
-					pItems[k++]  = item;
-					pAdded[item] = true;
-				}
-				else
-				{
-					skip = true;
+					for (int32_t j = i; j < k; j++)
+					{
+						pAdded[pItems[j]] = false;
+						cd.Remove(1);
+					}
+
+					k = i;
 					break;
 				}
 			}
-		}
 
-		if (skip) continue;
-
-		Support s = static_cast<Support>(pp[Pattern::SUPP_IDX]);
-		Support r = cd.GetSupport();
-
-		if (static_cast<std::size_t>(k) + pfExtCnt == pp[Pattern::LEN_IDX])
-		{
-#ifdef DEBUG
-			LOG_DEBUG << "s=" << s << "; r=" << r << std::endl;
-#endif
-			if (r < s)
+			for (PatternType p = 0; p < pp[Pattern::LEN_IDX]; p++)
 			{
-				std::memcpy(pM, pItems, k * sizeof(ItemID));
-				std::memcpy(pM + k, pPfExt, pfExtCnt * sizeof(ItemID));
-
-#ifdef DEBUG
-				for (int32_t i = 0; i < k + pfExtCnt; i++)
-					LOG_DEBUG << pM[i] << " ";
-				LOG_DEBUG << std::endl;
-#endif
-
-				cd.Update(pM, k + pfExtCnt, s);
-
-				PatternPair ppN;
-				ppN.first.reserve(k + pfExtCnt);
-				ppN.second = s;
-
-				for (PatternType p = 0; p < pp[Pattern::LEN_IDX]; p++)
+				PatternType i = pp[Pattern::DATA_IDX + p];
+				Support supp  = i >> 32;
+				ItemID item   = i & 0xFFFFFFFF;
+				if (supp == 0)
+					pPfExt[pfExtCnt++] = item;
+				else if (!pAdded[item])
 				{
-					PatternType id = pp[Pattern::DATA_IDX + p];
-					ppN.first.push_back(static_cast<PatternType>(pId2Item[id & 0xFFFFFFFF]));
+					if (cd.Add2(item, supp) > 0)
+					{
+						pItems[k++]  = item;
+						pAdded[item] = true;
+					}
+					else
+					{
+						skip = true;
+						break;
+					}
 				}
-
-				closed.push_back(ppN);
-
-#ifdef DEBUG
-				LOG_DEBUG << std::endl
-						  << std::endl;
-#endif
 			}
 
-			if (k > 0) pAdded[pItems[--k]] = false;
-			cd.Remove(1);
+			if (skip) continue;
+
+			Support s = static_cast<Support>(pp[Pattern::SUPP_IDX]);
+			Support r = cd.GetSupport();
+
+			if (static_cast<std::size_t>(k) + pfExtCnt == pp[Pattern::LEN_IDX])
+			{
+#ifdef DEBUG
+				LOG_DEBUG << "s=" << s << "; r=" << r << std::endl;
+#endif
+				if (r < s)
+				{
+					std::memcpy(pM, pItems, k * sizeof(ItemID));
+					std::memcpy(pM + k, pPfExt, pfExtCnt * sizeof(ItemID));
+
+#ifdef DEBUG
+					for (int32_t i = 0; i < k + pfExtCnt; i++)
+						LOG_DEBUG << pM[i] << " ";
+					LOG_DEBUG << std::endl;
+#endif
+
+					cd.Update(pM, k + pfExtCnt, s);
+
+					PatternPair ppN;
+					ppN.first.reserve(k + pfExtCnt);
+					ppN.second = s;
+
+					for (PatternType p = 0; p < pp[Pattern::LEN_IDX]; p++)
+					{
+						PatternType id = pp[Pattern::DATA_IDX + p];
+						ppN.first.push_back(static_cast<PatternType>(pId2Item[id & 0xFFFFFFFF]));
+					}
+
+					closed.push_back(ppN);
+
+#ifdef DEBUG
+					LOG_DEBUG << std::endl
+							  << std::endl;
+#endif
+				}
+
+				if (k > 0) pAdded[pItems[--k]] = false;
+				cd.Remove(1);
+			}
 		}
 	}
 
