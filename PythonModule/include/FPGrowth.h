@@ -26,33 +26,39 @@
 
 #pragma once
 #include <algorithm>
-#include <vector>
+#include <cstring>
 #include <deque>
 #include <map>
-#include <set>
-#include <stack>
-#include <cstring>
 #include <memory>
-#include <signal.h>
-#include <omp.h>
 #include <mutex>
+#include <set>
+#include <signal.h>
+#include <stack>
+#include <vector>
+
+#ifdef USE_OPENMP
+#include <omp.h>
+#endif
+
+#ifdef USE_MPI
+#include <mpi.h>
+#endif
 
 #include <experimental/vector>
 
 #include "Defines.h"
-#include "Logger.h"
-#include "Utils.h"
-#include "Timer.h"
-#include "Types.h"
 #include "FPNode.h"
+#include "Logger.h"
 #include "Memory.h"
 #include "SigTerm.h"
+#include "Timer.h"
+#include "Types.h"
+#include "Utils.h"
 
-#include "FrequencyRef.h"
-#include "FPTree.h"
-#include "Pattern.h"
 #include "ClosedDetect.h"
-
+#include "FPTree.h"
+#include "FrequencyRef.h"
+#include "Pattern.h"
 DEFINE_EXCEPTION(FPGException)
 
 class FPGrowth
@@ -100,7 +106,6 @@ public:
 		LOG_VERBOSE << "Reducing and sorting transactions ... " << std::flush;
 		timerSub.Start();
 
-
 		do
 		{
 			reduceTransactions(transactions);
@@ -125,11 +130,11 @@ public:
 		m_maxItemCnt = frequency.size();
 
 #ifdef USE_OPENMP
-		//omp_set_num_threads(4);
+		//		omp_set_num_threads(2);
 		m_objs = omp_get_max_threads();
 		LOG_INFO << "Number of Threads: " << m_objs << std::endl;
 #endif
-		m_pDataObjs = new DataObjs[m_objs]();
+		m_pDataObjs  = new DataObjs[m_objs]();
 		m_pThreadMem = new FPNMemory[m_objs];
 
 		for (int32_t i = 0; i < m_objs; i++)
@@ -140,7 +145,7 @@ public:
 
 		m_pPattern = new Pattern[m_maxItemCnt];
 
-		m_pIdx2Id = new uint32_t[m_maxItemCnt]();
+		m_pIdx2Id  = new uint32_t[m_maxItemCnt]();
 		m_pId2Item = new ItemC[m_maxItemCnt]();
 
 		m_pClosedDetect = new ClosedDetect(m_maxItemCnt);
@@ -171,11 +176,9 @@ public:
 			fF.push_back(p);
 		}
 
-
 		std::sort(std::begin(fF), std::end(fF), [](const RefPair& a, const RefPair& b) { return a.second->item() > b.second->item(); });
 
 		std::sort(std::begin(fF), std::end(fF), [](const RefPair& a, const RefPair& b) { return a.second->support > b.second->support; });
-
 
 		for (std::size_t i = 0; i < fF.size(); i++)
 		{
@@ -185,36 +188,34 @@ public:
 #endif
 		}
 
-
 		timerSub.Start();
 
 		for (TransactionC& trans : db)
 		{
-			std::sort(std::begin(trans), std::end(trans), [](const ItemRef& a, const ItemRef& b) { return *a.pFRef > * b.pFRef; });
+			std::sort(std::begin(trans), std::end(trans), [](const ItemRef& a, const ItemRef& b) { return *a.pFRef > *b.pFRef; });
 		}
 
-		std::sort(std::begin(db), std::end(db), [](const TransactionC& a, const TransactionC& b)
-				  {
-					  std::size_t l = a.size() > b.size() ? b.size() : a.size();
-					  for (std::size_t i = 0; i < l; i++)
-					  {
-						  if (a[i] != b[i])
-						  {
-							  if (a[i].Idx() > b[i].Idx())
-								  return false;
-							  else
-								  return true;
-						  }
-					  }
+		std::sort(std::begin(db), std::end(db), [](const TransactionC& a, const TransactionC& b) {
+			std::size_t l = a.size() > b.size() ? b.size() : a.size();
+			for (std::size_t i = 0; i < l; i++)
+			{
+				if (a[i] != b[i])
+				{
+					if (a[i].Idx() > b[i].Idx())
+						return false;
+					else
+						return true;
+				}
+			}
 
-					  if (a.size() == b.size())
-						  return false;
+			if (a.size() == b.size())
+				return false;
 
-					  if (a.size() > b.size())
-						  return true;
-					  else
-						  return false;
-				  });
+			if (a.size() > b.size())
+				return true;
+			else
+				return false;
+		});
 
 		std::reverse(std::begin(db), std::end(db));
 
@@ -226,7 +227,6 @@ public:
 		LOG_VERBOSE << "Sorting done after: " << timerSub << std::endl;
 
 		m_tree = new FPTree(fF, m_pIdx2Id, m_pId2Item, &m_memory);
-
 
 		for (TransactionC& trans : db)
 			m_tree->Add(trans, 1);
@@ -272,12 +272,12 @@ public:
 		return m_pId2Item;
 	}
 
-
 	const Pattern* Growth()
 	{
 		Timer t;
 		t.Start();
-		growthTop(m_tree);
+		if (!growthTop(m_tree)) return nullptr;
+
 		t.Stop();
 		std::size_t cnt = 0;
 		for (std::size_t i = 0; i < m_tree->cnt; i++)
@@ -313,18 +313,18 @@ private:
 				continue;
 			}
 
-			pH = pDst->pHeads + n;
-			pH->item = pSrc->pHeads[i].item;
-			pH->support = m_pDataObjs[tId].m_pSubs[i];
-			pH->list = nullptr;
-			pH->pMemory = pSrc->pMemory;
+			pH                          = pDst->pHeads + n;
+			pH->item                    = pSrc->pHeads[i].item;
+			pH->support                 = m_pDataObjs[tId].m_pSubs[i];
+			pH->list                    = nullptr;
+			pH->pMemory                 = pSrc->pMemory;
 			m_pDataObjs[tId].m_pSubs[i] = n++;
 		}
 
 		if (n == 0) return false;
 
 		// As the Tree is reused for several iterations initialize cnt and root support here
-		pDst->cnt = n;
+		pDst->cnt          = n;
 		pDst->root.support = 0;
 
 		std::size_t i;
@@ -350,10 +350,12 @@ private:
 			m_pDataObjs[tId].m_patternOpen = true;
 			std::memset(m_pDataObjs[tId].m_pAdded, 0, m_maxItemCnt);
 			std::memset(m_pDataObjs[tId].m_pAddedPerfExt, 0, m_maxItemCnt);
-			m_pDataObjs[tId].m_lastIDCnt = 0;
+			m_pDataObjs[tId].m_lastIDCnt    = 0;
 			m_pDataObjs[tId].m_perfExtIDCnt = 0;
 #ifdef DEBUG
-			LOG_DEBUG << std::endl << std::endl << "--- BEGIN PATTERN ---" << std::endl;
+			LOG_DEBUG << std::endl
+					  << std::endl
+					  << "--- BEGIN PATTERN ---" << std::endl;
 #endif
 		}
 	}
@@ -370,10 +372,9 @@ private:
 #endif
 			if (m_pClosedDetect->Add(item, supp) > 0)
 			{
-				m_pDataObjs[tId].m_pAdded[item] = true;
+				m_pDataObjs[tId].m_pAdded[item]                            = true;
 				m_pDataObjs[tId].m_pSupports[m_pDataObjs[tId].m_lastIDCnt] = supp;
 				m_pDataObjs[tId].m_pLastID[m_pDataObjs[tId].m_lastIDCnt++] = item;
-
 
 				if (m_pDataObjs[tId].m_lastIDCnt >= m_maxItemCnt) LOG_ERROR << "ERROR: lastIDCnt >= maxItemCnt" << std::endl;
 			}
@@ -391,19 +392,19 @@ private:
 
 		if (!m_pDataObjs[tId].m_pAddedPerfExt[item] && !m_pDataObjs[tId].m_pAdded[item])
 		{
-			m_pDataObjs[tId].m_pAddedPerfExt[item] = true;
+			m_pDataObjs[tId].m_pAddedPerfExt[item]                            = true;
 			m_pDataObjs[tId].m_pPerfExtIDs[m_pDataObjs[tId].m_perfExtIDCnt++] = item;
 		}
 	}
 
-	void pp(Pattern& results, const ItemID* pIDs, const std::size_t& size, const std::size_t& pos, const std::size_t& minLen, PatternType* pBase, PatternType basePos, const Support& supp)
+	void pp(Pattern& results, const ItemID* pIDs, const std::size_t& size, const std::size_t& pos, const std::size_t& minLen, PatternType* pBase, PatternType basePos, const Support& supp, const ItemC* pId2Item, const std::size_t& minPatternLength)
 	{
 		pBase[basePos++] = m_pId2Item[pIDs[pos]];
 		for (std::size_t i = pos + 1; i < size; i++)
-			pp(results, pIDs, size, i, minLen, pBase, basePos, supp);
+			pp(results, pIDs, size, i, minLen, pBase, basePos, supp, pId2Item, minPatternLength);
 
 		if (basePos >= minLen)
-			results.AddPattern(basePos, supp, pBase);
+			results.AddPattern(basePos, supp, pBase, pId2Item, minPatternLength);
 	}
 
 	void endLocalPattern(const int32_t& tId, const int64_t& pId, const ItemID& item)
@@ -422,15 +423,15 @@ private:
 #ifdef PERF_EXT_EXPANSION
 				// TODO: Add maxPatternLength
 				for (std::size_t i = 0; i < m_pDataObjs[tId].m_perfExtIDCnt; i++)
-					pp(m_pPattern[pId], m_pDataObjs[tId].m_pPerfExtIDs, m_pDataObjs[tId].m_perfExtIDCnt, i, m_minPatternLen, m_pDataObjs[tId].m_pPatternBase, static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s);
+					pp(m_pPattern[pId], m_pDataObjs[tId].m_pPerfExtIDs, m_pDataObjs[tId].m_perfExtIDCnt, i, m_minPatternLen, m_pDataObjs[tId].m_pPatternBase, static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s, GetId2Item(), m_minPatternLen);
 
 				if (m_pDataObjs[tId].m_lastIDCnt >= m_minPatternLen && (m_maxPatternLen == 0 || m_pDataObjs[tId].m_lastIDCnt <= m_maxPatternLen))
-					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s, m_pDataObjs[tId].m_pPatternBase);
+					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s, m_pDataObjs[tId].m_pPatternBase, GetId2Item(), m_minPatternLen);
 
 #else
 				for (std::size_t i = m_pDataObjs[tId].m_lastIDCnt; i < m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt; i++)
 					m_pDataObjs[tId].m_pPatternBase[i] = m_pDataObjs[tId].m_pPerfExtIDs[i - m_pDataObjs[tId].m_lastIDCnt] | (static_cast<ItemID>(0) << 32);
-				m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase);
+				m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase, GetId2Item(), static_cast<std::size_t>(m_minPatternLen));
 #endif
 #else // Only extract closed pattern
 				Support r = m_pClosedDetect->GetSupport();
@@ -456,9 +457,10 @@ private:
 #endif
 
 					m_pClosedDetect->Update(m_pDataObjs[tId].m_pCMem, k, s);
-					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase);
+					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase, s, GetId2Item(), m_minPatternLen);
 #ifdef DEBUG
-					LOG_DEBUG << std::endl << std::endl;
+					LOG_DEBUG << std::endl
+							  << std::endl;
 #endif
 				}
 #endif
@@ -489,9 +491,19 @@ private:
 		}
 	}
 
-
-	void growthTop(FPTree* pTree)
+	bool growthTop(FPTree* pTree)
 	{
+#ifdef USE_MPI
+		int rank;
+		int procs;
+		MPI_Init(NULL, NULL);
+
+		MPI_Comm_size(MPI_COMM_WORLD, &procs);
+		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+		std::cout << "PROCS: " << procs << " | Rank: " << rank << std::endl;
+#endif
+
 		FPTree** ppDst = new FPTree*[m_objs]();
 
 #ifdef WITH_SIG_TERM
@@ -502,20 +514,30 @@ private:
 		{
 			for (int32_t i = 0; i < m_objs; i++)
 			{
-				ppDst[i] = new FPTree(m_tree->cnt - 1, m_tree->pIdx2Id, m_tree->pId2Item, &m_pThreadMem[i]);
-				ppDst[i]->root.id = IDX_MAX;
-				ppDst[i]->root.succ = nullptr;
+				ppDst[i]              = new FPTree(m_tree->cnt - 1, m_tree->pIdx2Id, m_tree->pId2Item, &m_pThreadMem[i]);
+				ppDst[i]->root.id     = IDX_MAX;
+				ppDst[i]->root.succ   = nullptr;
 				ppDst[i]->root.parent = nullptr;
 			}
 		}
+
+		int64_t start = 0;
+		int64_t end   = static_cast<int64_t>(pTree->cnt);
+		int64_t inc   = 1;
+
+#ifdef USE_MPI
+		const int64_t iterationsPerProc = static_cast<int64_t>(pTree->cnt / procs);
+		start                           = rank;
+		inc                             = procs;
+#endif
 
 #ifdef USE_OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
 #ifdef ALL_PATTERN
-		for (int64_t i = 0; i < (int64_t)pTree->cnt; i++)
+		for (int64_t i = start; i < end; i += inc)
 #else
-		for (int64_t i = pTree->cnt - 1; i > -1; i--)
+		for (int64_t i = itrEnd - 1; i >= itrStart; i--)
 #endif
 		{
 #ifdef USE_OPENMP
@@ -540,30 +562,86 @@ private:
 					growth(tId, i, ppDst[tId]);
 			}
 
-			endLocalPattern(tId, i,  pH->item);
+			endLocalPattern(tId, i, pH->item);
 
 			EndPattern(tId, pH->item);
 #ifdef ALL_PATTERN
 			LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
 #else
-			LOG_INFO << "\r" << pTree->cnt-i << " / " << pTree->cnt << " Done" << std::flush;
+			LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
 #endif
 		}
 
 		for (int32_t i = 0; i < m_objs; i++)
-			if (ppDst[i]) delete(ppDst[i]);
+			if (ppDst[i]) delete (ppDst[i]);
 
 		delete[] ppDst;
 
 		LOG_INFO << std::endl;
+
+#ifdef USE_MPI
+		const int ROOT_RANK = 0;
+		const int MSG_TAG   = 0;
+
+		if (rank == ROOT_RANK)
+		{
+			Timer comTime;
+			comTime.Start();
+			MPI_Status status;
+			int64_t fullCnt = 0;
+
+			for (int i = 0; i < procs; i++)
+			{
+				if (i == ROOT_RANK) continue;
+				int dataCnt;
+				int procResCnt = 0;
+
+				for (uint32_t j = 0; j < iterationsPerProc; j++)
+				{
+					std::vector<PatternType> data;
+					MPI_Probe(i, MSG_TAG, MPI_COMM_WORLD, &status);
+					MPI_Get_count(&status, MPI_UNSIGNED_LONG_LONG, &dataCnt);
+					data.resize(dataCnt);
+					MPI_Recv(data.data(), dataCnt, MPI_UNSIGNED_LONG_LONG, i, MSG_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+					procResCnt += dataCnt;
+
+					for (int k = 0; k < dataCnt; k += data[k] + Pattern::OFFSET)
+						m_pPattern[j * procs + i].AddPattern(data[k], data[k + 1], &data[k + 2]);
+				}
+				std::cout << "Recieved " << procResCnt << " values from Rank: " << i << std::endl;
+				fullCnt += procResCnt;
+			}
+			comTime.Stop();
+			std::cout << "Merged all results in Rank: " << ROOT_RANK << " final count: " << fullCnt << " Done after: " << comTime << std::endl;
+		}
+		else
+		{
+			for (uint32_t i = rank; i < static_cast<int64_t>(pTree->cnt); i += procs)
+			{
+				std::vector<PatternType> data;
+				for (const PatternType* pPtr : m_pPattern[i])
+				{
+					for (PatternType i = 0; i < pPtr[Pattern::LEN_IDX] + Pattern::OFFSET; i++)
+						data.push_back(pPtr[i]);
+				}
+
+				MPI_Send(data.data(), static_cast<int>(data.size()), MPI_UNSIGNED_LONG_LONG, ROOT_RANK, MSG_TAG, MPI_COMM_WORLD);
+			}
+		}
+		MPI_Finalize();
+
+		return rank == ROOT_RANK;
+#endif
+
+		return true;
 	}
 
 	void growth(const int32_t& tId, const int64_t& pId, FPTree* pTree)
 	{
-		FPTree* pDst = nullptr;
-		FPHead* pH = nullptr;
+		FPTree* pDst  = nullptr;
+		FPHead* pH    = nullptr;
 		FPNode* pNode = nullptr;
-		FPNode* pAnc = nullptr;
+		FPNode* pAnc  = nullptr;
 
 #ifdef WITH_SIG_TERM
 		if (sigAborted()) throw(FPGException("CTRL-C abort"));
@@ -571,9 +649,9 @@ private:
 
 		if (pTree->cnt > 1)
 		{
-			pDst = new FPTree(m_tree->cnt - 1, m_tree->pIdx2Id, m_tree->pId2Item, &m_pThreadMem[tId]);
-			pDst->root.id = IDX_MAX;
-			pDst->root.succ = nullptr;
+			pDst              = new FPTree(m_tree->cnt - 1, m_tree->pIdx2Id, m_tree->pId2Item, &m_pThreadMem[tId]);
+			pDst->root.id     = IDX_MAX;
+			pDst->root.succ   = nullptr;
 			pDst->root.parent = nullptr;
 		}
 
@@ -601,7 +679,7 @@ private:
 		}
 
 		pTree->pMemory->PopState();
-		if (pDst) delete(pDst);
+		if (pDst) delete (pDst);
 	}
 
 	FrequencyMap getFrequency(const Transactions& transactions)
@@ -627,7 +705,7 @@ private:
 				{
 					it = trans.erase(it);
 					if (it != std::begin(trans))
-						it--; // Decrement because erase returns the iterater after the deleted element which would be skipped due to the loop increment 
+						it--; // Decrement because erase returns the iterater after the deleted element which would be skipped due to the loop increment
 					reduced = true;
 
 					if (it == std::end(trans)) break;
@@ -644,9 +722,6 @@ private:
 	{
 		std::experimental::erase_if(transactions, [&minPatternLen = m_minPatternLen](const Transaction& t) { return t.size() < minPatternLen; });
 	}
-
-
-
 
 private:
 	Support m_minSupport;
@@ -689,9 +764,11 @@ private:
 			m_patternOpen(false),
 			m_pPatternBase(nullptr)
 #ifndef ALL_PATTERN
-			, m_pCMem(nullptr)
+			,
+			m_pCMem(nullptr)
 #endif
-		{}
+		{
+		}
 
 		~DataObjs()
 		{
@@ -711,13 +788,13 @@ private:
 		void Init(const std::size_t& elements)
 		{
 			m_pSubs = new Support[elements]();
-			m_pMap = new std::size_t[elements]();
+			m_pMap  = new std::size_t[elements]();
 
-			m_pAdded = new bool[elements]();
+			m_pAdded        = new bool[elements]();
 			m_pAddedPerfExt = new bool[elements]();
-			m_pLastID = new ItemID[elements]();
-			m_pPerfExtIDs = new ItemID[elements]();
-			m_pSupports = new Support[elements]();
+			m_pLastID       = new ItemID[elements]();
+			m_pPerfExtIDs   = new ItemID[elements]();
+			m_pSupports     = new Support[elements]();
 
 			m_pPatternBase = new PatternType[elements]();
 #ifndef ALL_PATTERN
@@ -753,7 +830,7 @@ void PostProcessing(const Pattern* pPattern, const std::size_t& maxC, const std:
 			if (sigAborted()) throw(FPGException("CTRL-C abort"));
 #endif
 			const PatternType* pStart = pPtr + Pattern::DATA_IDX;
-			const PatternType* pEnd = pStart + pPtr[Pattern::LEN_IDX];
+			const PatternType* pEnd   = pStart + pPtr[Pattern::LEN_IDX];
 			if (pPtr[Pattern::LEN_IDX] <= maxC)
 			{
 				if (std::any_of(pStart, pEnd, [&winLen, &pId2Item](const PatternType& i) { return ((pId2Item[i & 0xFFFFFFFF]) % winLen) == 0; }))
@@ -772,7 +849,6 @@ void PostProcessing(const Pattern* pPattern, const std::size_t& maxC, const std:
 	std::size_t cnt = 0;
 	for (std::size_t i = 0; i < itemCount; i++)
 		cnt += pPattern[i].GetCount();
-
 
 	timer.Stop();
 	LOG_VERBOSE << "Done after: " << timer << std::endl;
@@ -794,13 +870,13 @@ void ClosedDetection(const std::size_t& itemCount, const ItemC* pId2Item, const 
 	timer.Start();
 
 	ClosedDetect cd(itemCount);
-	PatternType* pM = new PatternType[itemCount];
+	PatternType* pM     = new PatternType[itemCount];
 	PatternType* pPfExt = new PatternType[itemCount];
 	PatternType* pItems = new PatternType[itemCount];
-	bool* pAdded = new bool[itemCount]();
+	bool* pAdded        = new bool[itemCount]();
 
 	ItemID base = ITEM_ID_MAX;
-	int32_t k = 0;
+	int32_t k   = 0;
 
 	for (const PatternType* pp : itemSets)
 	{
@@ -808,7 +884,7 @@ void ClosedDetection(const std::size_t& itemCount, const ItemC* pId2Item, const 
 		if (sigAborted()) throw(FPGException("CTRL-C abort"));
 #endif
 		int32_t pfExtCnt = 0;
-		bool skip = false;
+		bool skip        = false;
 
 		if (base != pp[Pattern::DATA_IDX])
 		{
@@ -837,15 +913,15 @@ void ClosedDetection(const std::size_t& itemCount, const ItemC* pId2Item, const 
 		for (PatternType p = 0; p < pp[Pattern::LEN_IDX]; p++)
 		{
 			PatternType i = pp[Pattern::DATA_IDX + p];
-			Support supp = i >> 32;
-			ItemID item = i & 0xFFFFFFFF;
+			Support supp  = i >> 32;
+			ItemID item   = i & 0xFFFFFFFF;
 			if (supp == 0)
 				pPfExt[pfExtCnt++] = item;
 			else if (!pAdded[item])
 			{
 				if (cd.Add2(item, supp) > 0)
 				{
-					pItems[k++] = item;
+					pItems[k++]  = item;
 					pAdded[item] = true;
 				}
 				else
@@ -892,7 +968,8 @@ void ClosedDetection(const std::size_t& itemCount, const ItemC* pId2Item, const 
 				closed.push_back(ppN);
 
 #ifdef DEBUG
-				LOG_DEBUG << std::endl << std::endl;
+				LOG_DEBUG << std::endl
+						  << std::endl;
 #endif
 			}
 
@@ -910,4 +987,3 @@ void ClosedDetection(const std::size_t& itemCount, const ItemC* pId2Item, const 
 	LOG_VERBOSE << "Done after: " << timer << std::endl;
 	LOG_INFO << "Closed Pattern: " << closed.size() << std::endl;
 }
-

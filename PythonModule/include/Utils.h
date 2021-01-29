@@ -34,7 +34,8 @@
 #include <memory>
 #include <exception>
 #include <iostream>
-
+#include <cmath>
+#include <unistd.h>
 
 #define CLASS_TAG(_C_) "[" << _C_ << "::" << __func__ << "] "
 
