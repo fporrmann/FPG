@@ -65,7 +65,11 @@ class FPGrowth
 {
 	DISABLE_COPY_ASSIGN_MOVE(FPGrowth)
 public:
-	FPGrowth(Transactions& transactions, const Support minSupport = 1, const uint32_t minPatternLen = 1, const uint32_t maxPatternLen = 0) :
+	// Threads = 0 - Use maximal available amount of threads
+	// Threads = -1 or 1 disable multithreading, only use 1 thread
+	// Threads = x <= MAX_THREADS - Use x threads
+	// Threads = x > MAX_THREADS  - Use MAX_THREADS threads
+	FPGrowth(Transactions& transactions, const Support minSupport = 1, const uint32_t minPatternLen = 1, const uint32_t maxPatternLen = 0, const int32_t threads = 0) :
 		m_minSupport(minSupport),
 		m_minPatternLen(minPatternLen),
 		m_maxPatternLen(maxPatternLen),
@@ -89,6 +93,9 @@ public:
 #endif
 #else
 		std::string mode = "Closed Itemsets";
+#endif
+#ifdef USE_MPI
+		mode += " - with MPI";
 #endif
 		LOG_INFO << "  =====  FP-Growth (" << mode << ")  =====" << std::endl;
 
@@ -130,10 +137,25 @@ public:
 		m_maxItemCnt = frequency.size();
 
 #ifdef USE_OPENMP
-		//		omp_set_num_threads(2);
+		int32_t maxThreads = omp_get_num_threads();
+		if ((threads <= maxThreads && threads > 1))
+		{
+			LOG_INFO << "Limiting the number of threads to " << threads << std::endl;
+			omp_set_num_threads(threads);
+		}
+		else if (threads == 1 || threads == -1)
+		{
+			LOG_INFO << "Multi-threading disabled" << std::endl;
+			omp_set_num_threads(1);
+		}
+		else if (threads > maxThreads)
+			LOG_WARNING << "Set number of threads (" << threads << ") exceeds the maximal available number of threads (" << maxThreads << "), limiting to maximal number" << std::endl;
+
 		m_objs = omp_get_max_threads();
-		LOG_INFO << "Number of Threads: " << m_objs << std::endl;
+		if (threads == 0 || threads > 1)
+			LOG_INFO << "Number of Threads: " << m_objs << std::endl;
 #endif
+
 		m_pDataObjs  = new DataObjs[m_objs]();
 		m_pThreadMem = new FPNMemory[m_objs];
 
@@ -572,9 +594,11 @@ private:
 
 			EndPattern(tId, pH->item);
 #ifdef ALL_PATTERN
-			LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
+			if (tId == 0)
+				LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
 #else
-			LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
+			if (tId == 0)
+				LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
 #endif
 		}
 
@@ -583,7 +607,7 @@ private:
 
 		delete[] ppDst;
 
-		LOG_INFO << std::endl;
+		LOG_INFO << "\r" << pTree->cnt << " / " << pTree->cnt << " Done" << std::endl;
 
 #ifdef USE_MPI
 		const int ROOT_RANK = 0;

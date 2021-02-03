@@ -63,7 +63,7 @@
 	}
 
 #define MAJOR_VERSION 0
-#define MINOR_VERSION 2
+#define MINOR_VERSION 3
 #define PATCH_VERSION 0
 
 #define VERSION              \
@@ -106,7 +106,7 @@ PyMODINIT_FUNC INIT_FUNC_NAME(MODULE_NAME)(void)
 {
 	Py_Initialize();
 	PyObject* pModule = PyModule_Create(&ModuleDefinitions);
-	PyModule_AddObject(pModule, "version", Py_BuildValue("s", "version 0.1-Alpha"));
+	PyModule_AddObject(pModule, "version", Py_BuildValue("s", "version 0.3-Alpha"));
 	return pModule;
 }
 
@@ -150,7 +150,7 @@ static constexpr ItemC WIN_LEN = 20;
 PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 {
 	UNUSED(self);
-	const char* ckwds[] = { "tracts", "target", "supp", "zmin", "zmax", "report", "algo", "winlen", "verbose", nullptr };
+	const char* ckwds[] = { "tracts", "target", "supp", "zmin", "zmax", "report", "algo", "winlen", "verbose", "threads", nullptr };
 	PyObject* tracts;
 	char* target    = nullptr;
 	double supp     = 10;
@@ -161,6 +161,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	char* algo      = nullptr;
 	uint32_t winlen = WIN_LEN;
 	int32_t verbose = ToUnderlying(Verbosity::VB_INFO);
+	int32_t threads = 1;
 	Verbosity verbosity;
 	Timer fullTimer;
 
@@ -169,8 +170,10 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	fullTimer.Start();
 
 	// ===== Evaluate the Function Arguments ===== //
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|sdIIssII", const_cast<char**>(ckwds), &tracts, &target, &supp, &zmin, &zmax, &report, &algo, &winlen, &verbose))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|sdIIssIII", const_cast<char**>(ckwds), &tracts, &target, &supp, &zmin, &zmax, &report, &algo, &winlen, &verbose, &threads))
 		return nullptr;
+
+	if (threads < -1) threads = -1;
 
 	support   = static_cast<Support>(std::abs(supp));
 	verbosity = ToVerbosity(verbose);
@@ -238,7 +241,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 	try
 	{
-		FPGrowth fp(transactions, support, zmin, zmax);
+		FPGrowth fp(transactions, support, zmin, zmax, threads);
 		const Pattern* pPattern = fp.Growth();
 
 		std::cout << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
