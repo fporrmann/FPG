@@ -170,9 +170,8 @@ public:
 		m_patternCnt++;
 	}
 
-	void AddPattern(const PatternType& patternLength, const Support& support, PatternType* pData, const ItemC* pId2Item, const std::size_t& minPatternLength)
+	void AddPattern(const PatternType& patternLength, const Support& support, PatternType* pData, const ItemC* pId2Item, const std::size_t& minPatternLength, const ItemC& winLen)
 	{
-		const ItemC winLen        = 20;
 		const PatternType* pStart = pData;
 		const PatternType* pEnd   = pData + patternLength;
 		if (std::any_of(pStart, pEnd, [&winLen, &pId2Item](const PatternType& i) { return ((pId2Item[i & 0xFFFFFFFF]) % winLen) == 0; }))

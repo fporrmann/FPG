@@ -46,29 +46,29 @@
 #define STRINGIFY(x) #x
 #define TO_STRING(x) STRINGIFY(x)
 
-#define ERR_TYPE(s)                      \
-	{                                      \
+#define ERR_TYPE(s)                          \
+	{                                        \
 		sigRemove();                         \
 		PyErr_SetString(PyExc_TypeError, s); \
 	}
 
-#define ERR_MEM(s)                         \
-	{                                        \
+#define ERR_MEM(s)                             \
+	{                                          \
 		sigRemove();                           \
 		PyErr_SetString(PyExc_MemoryError, s); \
 	}
 
-#define ERR_ABORT()                                    \
-	{                                                    \
+#define ERR_ABORT()                                        \
+	{                                                      \
 		sigRemove();                                       \
 		PyErr_SetString(PyExc_RuntimeError, "user abort"); \
 	}
 
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 3
-#define PATCH_VERSION 1
+#define PATCH_VERSION 2
 
-#define VERSION            \
+#define VERSION              \
 	TO_STRING(MAJOR_VERSION) \
 	"." TO_STRING(MINOR_VERSION) "." TO_STRING(PATCH_VERSION)
 
@@ -243,7 +243,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 	try
 	{
-		FPGrowth fp(transactions, support, zmin, zmax, threads);
+		FPGrowth fp(transactions, support, zmin, zmax, static_cast<ItemC>(winlen), threads);
 		const Pattern* pPattern = fp.Growth();
 		LOG_INFO << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
 
