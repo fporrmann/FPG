@@ -15,29 +15,25 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (USE_OPENMP)
-  add_definitions(-DUSE_OPENMP)
   find_package(OpenMP REQUIRED)
+  add_definitions(-DUSE_OPENMP)
 endif()
 
 include_directories(include)
 
-# Currently MPI and Python are mutually exclusive
 if (USE_MPI)
   find_package(MPI REQUIRED)
   add_definitions(-DUSE_MPI)
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
-
-  file(GLOB src "main.cpp")
-  add_executable(${PROJECT_NAME} ${src})
-else()
-  find_package(PythonLibs COMPONENTS Development REQUIRED)
-  add_definitions(-DMODULE_NAME=${PROJECT_NAME} -DWITH_SIG_TERM)
-  include_directories(SYSTEM ${PYTHON_INCLUDE_DIRS})
-
-  file(GLOB src "src/*.cpp")
-  add_library(${PROJECT_NAME} SHARED ${src})
-  set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "") # disable the "lib" prefix
 endif()
+
+find_package(PythonLibs COMPONENTS Development REQUIRED)
+add_definitions(-DMODULE_NAME=${PROJECT_NAME} -DWITH_SIG_TERM)
+include_directories(SYSTEM ${PYTHON_INCLUDE_DIRS})
+
+file(GLOB src "src/*.cpp")
+add_library(${PROJECT_NAME} SHARED ${src})
+set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "") # disable the "lib" prefix
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON) # enable fPIC
 
@@ -45,7 +41,9 @@ if (OPENMP_FOUND)
 	target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
 endif()
 
-target_link_libraries(${PROJECT_NAME} PRIVATE ${MPI_CXX_LIBRARIES})
+if (MPI_FOUND)
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${MPI_CXX_LIBRARIES})
+endif()
 
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)

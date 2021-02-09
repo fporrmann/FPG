@@ -46,27 +46,29 @@
 #define STRINGIFY(x) #x
 #define TO_STRING(x) STRINGIFY(x)
 
-#define ERR_TYPE(s)                          \
-	{                                        \
+#define ERR_TYPE(s)                      \
+	{                                      \
 		sigRemove();                         \
 		PyErr_SetString(PyExc_TypeError, s); \
 	}
-#define ERR_MEM(s)                             \
-	{                                          \
+
+#define ERR_MEM(s)                         \
+	{                                        \
 		sigRemove();                           \
 		PyErr_SetString(PyExc_MemoryError, s); \
 	}
-#define ERR_ABORT()                                        \
-	{                                                      \
+
+#define ERR_ABORT()                                    \
+	{                                                    \
 		sigRemove();                                       \
 		PyErr_SetString(PyExc_RuntimeError, "user abort"); \
 	}
 
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 3
-#define PATCH_VERSION 0
+#define PATCH_VERSION 1
 
-#define VERSION              \
+#define VERSION            \
 	TO_STRING(MAJOR_VERSION) \
 	"." TO_STRING(MINOR_VERSION) "." TO_STRING(PATCH_VERSION)
 
@@ -243,15 +245,10 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	{
 		FPGrowth fp(transactions, support, zmin, zmax, threads);
 		const Pattern* pPattern = fp.Growth();
-
-		std::cout << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
-
-		std::vector<const PatternType*> processed;
-		//PostProcessing(pPattern, transactions.size(), fp.GetItemCount(), zmin, winlen, fp.GetId2Item(), processed);
-
-		std::cout << "Memory Usage after Post Processiong: " << GetMemString() << std::endl;
+		LOG_INFO << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
 
 		ClosedDetection(fp, pPattern, closed);
+		LOG_INFO << "Memory Usage after Closed Detection: " << GetMemString() << std::endl;
 	}
 	catch (const FPGException& e)
 	{
@@ -261,7 +258,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		return nullptr;
 	}
 
-	std::cout << "Converting Pattern to Python List ... " << std::flush;
+	LOG_INFO << "Converting Pattern to Python List ... " << std::flush;
 	Timer t;
 	t.Start();
 
@@ -290,11 +287,11 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		}
 
 		t.Stop();
-		std::cout << "Done after: " << t << std::endl;
-		std::cout << "Memory Usage after Conmversion: " << GetMemString() << std::endl;
+		LOG_INFO << "Done after: " << t << std::endl;
+		LOG_INFO << "Memory Usage after Conmversion: " << GetMemString() << std::endl;
 
 		fullTimer.Stop();
-		std::cout << " =========  FPGrowth C++ Module End (" << fullTimer << ")  ========= " << std::endl;
+		LOG_INFO << " =========  FPGrowth C++ Module End (" << fullTimer << ")  ========= " << std::endl;
 
 		sigRemove();
 		return pyList;
