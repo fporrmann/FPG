@@ -24,10 +24,15 @@
  *  
  */
 
+/*
+ * The following implementation is in large parts, based on the closed item set
+ * filter implemented by Christian Borgelt (https://borgelt.net/fpgrowth.html)
+ */
+
 #pragma once
 
-#include "Types.h"
 #include "Memory.h"
+#include "Types.h"
 #include "Utils.h"
 
 struct ClosedNode
@@ -36,8 +41,6 @@ struct ClosedNode
 	Support supp;
 	ClosedNode* sibling;
 	ClosedNode* children;
-
-
 
 	void SetFreeNode(ClosedNode* pNode)
 	{
@@ -62,7 +65,8 @@ public:
 		m_item(ITEM_MAX),
 		m_max(0),
 		m_root()
-	{}
+	{
+	}
 
 	~ClosedTree()
 	{
@@ -72,11 +76,11 @@ public:
 	void Init()
 	{
 		if (m_pMem == nullptr) m_pMem = new CNMemory(4095);
-		m_item = ITEM_MAX;
-		m_max = 0;
+		m_item         = ITEM_MAX;
+		m_max          = 0;
 		m_root.sibling = m_root.children = nullptr;
-		m_root.item = ITEM_MAX;
-		m_root.supp = 0;
+		m_root.item                      = ITEM_MAX;
+		m_root.supp                      = 0;
 	}
 
 	bool Valid() const
@@ -105,18 +109,18 @@ public:
 			pNode = *p;
 		} while (pNode && (pNode->item == i));
 
-		pNode = m_pMem->Alloc();
-		pNode->supp = supp;
-		pNode->item = i;
+		pNode          = m_pMem->Alloc();
+		pNode->supp    = supp;
+		pNode->item    = i;
 		pNode->sibling = *p;
-		*p = pNode;
+		*p             = pNode;
 
 		while (--n >= 0)
 		{
 			pNode = pNode->children = m_pMem->Alloc();
-			pNode->supp = supp;
-			pNode->item = *pItems++;
-			pNode->sibling = nullptr;
+			pNode->supp             = supp;
+			pNode->item             = *pItems++;
+			pNode->sibling          = nullptr;
 		}
 
 		pNode->children = nullptr;
@@ -130,7 +134,7 @@ public:
 
 		pDst->SetItem(ITEM_MAX - 1);
 		pDst->SetMax(0);
-		m_max = 0;
+		m_max                = 0;
 		pDst->GetRoot().supp = 0;
 
 		p = &m_root;
@@ -141,12 +145,12 @@ public:
 		if (!p || (p->item != m_item)) return pDst;
 
 		pDst->GetRoot().supp = p->supp;
-		m_max = p->supp;
+		m_max                = p->supp;
 
 		if (p->children)
 			pDst->GetRoot().children = p = pDst->copy(p->children);
 
-		p = &m_root;
+		p           = &m_root;
 		p->children = prune(p->children, m_item + 1);
 
 		return pDst;
@@ -157,19 +161,19 @@ public:
 		ClosedNode* p;
 
 		m_item = item;
-		p = &m_root;
+		p      = &m_root;
 		p = p->children = prune(p->children, item);
-		m_max = (p && (p->item == item)) ? p->supp : 0;
+		m_max           = (p && (p->item == item)) ? p->supp : 0;
 	}
 
 	void Clear()
 	{
 		m_pMem->Clear();
-		m_max = 0;
-		m_item = ITEM_MAX;
-		m_root.sibling = nullptr;
+		m_max           = 0;
+		m_item          = ITEM_MAX;
+		m_root.sibling  = nullptr;
 		m_root.children = nullptr;
-		m_root.supp = 0;
+		m_root.supp     = 0;
 	}
 
 	const ItemID& GetItem() const
@@ -223,15 +227,15 @@ private:
 			if (s1->item > s2->item)
 			{
 				*ppEnd = s1;
-				ppEnd = &s1->sibling;
-				s1 = *ppEnd;
+				ppEnd  = &s1->sibling;
+				s1     = *ppEnd;
 				if (!s1) break;
 			}
 			else if (s2->item > s1->item)
 			{
 				*ppEnd = s2;
-				ppEnd = &s2->sibling;
-				s2 = *ppEnd;
+				ppEnd  = &s2->sibling;
+				s2     = *ppEnd;
 				if (!s2) break;
 			}
 			else
@@ -240,12 +244,13 @@ private:
 				if (s1->supp < s2->supp)
 					s1->supp = s2->supp;
 
-				p = s2; s2 = s2->sibling;
+				p  = s2;
+				s2 = s2->sibling;
 				m_pMem->Free(p);
 
 				*ppEnd = s1;
-				ppEnd = &s1->sibling;
-				s1 = *ppEnd;
+				ppEnd  = &s1->sibling;
+				s1     = *ppEnd;
 				if (!s1 || !s2) break;
 			}
 		}
@@ -256,18 +261,19 @@ private:
 
 	ClosedNode* prune(ClosedNode* node, const ItemID& item)
 	{
-		ClosedNode* p, * b = NULL;
+		ClosedNode *p, *b = NULL;
 
 		while (node && (node->item > item))
 		{
 			node->children = p = prune(node->children, item);
 			if (p) b = (!b) ? p : merge(b, p);
-			p = node;
+			p    = node;
 			node = node->sibling;
 			m_pMem->Free(p);
 		}
 
-		return (!node) ? b : (!b) ? node : merge(b, node);
+		return (!node) ? b : (!b) ? node
+								  : merge(b, node);
 	}
 
 	ClosedNode* copy(const ClosedNode* pSrc)
@@ -284,7 +290,7 @@ private:
 
 			pNode->item = pSrc->item;
 			pNode->supp = pSrc->supp;
-			pC = pSrc->children;
+			pC          = pSrc->children;
 			if (pC)
 			{
 				pC = copy(pC);
@@ -292,14 +298,13 @@ private:
 			}
 
 			pNode->children = pC;
-			ppEnd = &pNode->sibling;
-			pSrc = pSrc->sibling;
+			ppEnd           = &pNode->sibling;
+			pSrc            = pSrc->sibling;
 		} while (pSrc);
 
 		*ppEnd = nullptr;
 		return pDst;
 	}
-
 
 private:
 	CNMemory* m_pMem;
