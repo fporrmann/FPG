@@ -170,28 +170,31 @@ public:
 		m_patternCnt++;
 	}
 
-	void AddPattern(const PatternType& patternLength, const Support& support, PatternType* pData, const ItemC* pId2Item, const std::size_t& minPatternLength, const ItemC& winLen)
+	void AddPattern(const PatternType& patternLength, const Support& support, PatternType* pData, const ItemC* pId2Item, const Support& maxSupport, const std::size_t& minNeuronCount, const ItemC& winLen)
 	{
 		const PatternType* pStart = pData;
 		const PatternType* pEnd   = pData + patternLength;
 		if (std::any_of(pStart, pEnd, [&winLen, &pId2Item](const PatternType& i) { return ((pId2Item[i & 0xFFFFFFFF]) % winLen) == 0; }))
 		{
-			std::set<PatternType> v;
-			std::transform(pStart, pEnd, std::inserter(v, std::begin(v)), [&winLen, &pId2Item](const PatternType& i) { return (pId2Item[i & 0xFFFFFFFF]) / winLen; });
-			if (v.size() >= minPatternLength)
+			if(support <= maxSupport)
 			{
-				PatternType* pPattern = getNextPattern(patternLength);
-				pPattern[LEN_IDX]     = patternLength; // Set pattern length
-				pPattern[SUPP_IDX]    = support;       // Set pattern support
-				// Set pattern data
-				std::memcpy(pPattern + OFFSET, pData, patternLength * sizeof(PatternType));
-#ifdef DEBUG
-				LOG_DEBUG << "Adding Pattern: " << std::flush;
-				for (PatternType i = 0; i < patternLength; i++)
-					LOG_DEBUG << (char)pData[i] << " ";
-				LOG_DEBUG << "(" << support << ")" << std::endl;
-#endif
-				m_patternCnt++;
+				std::set<PatternType> v;
+				std::transform(pStart, pEnd, std::inserter(v, std::begin(v)), [&winLen, &pId2Item](const PatternType& i) { return (pId2Item[i & 0xFFFFFFFF]) / winLen; });
+				if (v.size() >= minNeuronCount)
+				{
+					PatternType* pPattern = getNextPattern(patternLength);
+					pPattern[LEN_IDX]     = patternLength; // Set pattern length
+					pPattern[SUPP_IDX]    = support;       // Set pattern support
+					// Set pattern data
+					std::memcpy(pPattern + OFFSET, pData, patternLength * sizeof(PatternType));
+	#ifdef DEBUG
+					LOG_DEBUG << "Adding Pattern: " << std::flush;
+					for (PatternType i = 0; i < patternLength; i++)
+						LOG_DEBUG << (char)pData[i] << " ";
+					LOG_DEBUG << "(" << support << ")" << std::endl;
+	#endif
+					m_patternCnt++;
+				}
 			}
 		}
 	}

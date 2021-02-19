@@ -65,8 +65,8 @@
 	}
 
 #define MAJOR_VERSION 0
-#define MINOR_VERSION 3
-#define PATCH_VERSION 2
+#define MINOR_VERSION 4
+#define PATCH_VERSION 0
 
 #define VERSION              \
 	TO_STRING(MAJOR_VERSION) \
@@ -152,13 +152,15 @@ static constexpr ItemC WIN_LEN = 20;
 PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 {
 	UNUSED(self);
-	const char* ckwds[] = { "tracts", "target", "supp", "zmin", "zmax", "report", "algo", "winlen", "verbose", "threads", nullptr };
+	const char* ckwds[] = { "tracts", "target", "supp", "zmin", "zmax", "report", "algo", "winlen", "max_c", "min_neu", "verbose", "threads", nullptr };
 	PyObject* tracts;
 	char* target    = nullptr;
 	double supp     = 10;
 	Support support = 0;
 	uint32_t zmin   = 1;
 	uint32_t zmax   = 0;
+	uint32_t maxc   = -1;
+	uint32_t minneu = 1;
 	char* report    = nullptr;
 	char* algo      = nullptr;
 	uint32_t winlen = WIN_LEN;
@@ -172,7 +174,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	fullTimer.Start();
 
 	// ===== Evaluate the Function Arguments ===== //
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|sdIIssIII", const_cast<char**>(ckwds), &tracts, &target, &supp, &zmin, &zmax, &report, &algo, &winlen, &verbose, &threads))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|sdIIssIIIII", const_cast<char**>(ckwds), &tracts, &target, &supp, &zmin, &zmax, &report, &algo, &winlen, &maxc, &minneu, &verbose, &threads))
 		return nullptr;
 
 	if (threads < -1) threads = -1;
@@ -243,7 +245,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 	try
 	{
-		FPGrowth fp(transactions, support, zmin, zmax, static_cast<ItemC>(winlen), threads);
+		FPGrowth fp(transactions, support, zmin, zmax, static_cast<ItemC>(winlen), maxc, minneu, threads);
 		const Pattern* pPattern = fp.Growth();
 		LOG_INFO << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
 

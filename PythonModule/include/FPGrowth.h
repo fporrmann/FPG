@@ -69,11 +69,13 @@ public:
 	// Threads = -1 or 1 disable multithreading, only use 1 thread
 	// Threads = x <= MAX_THREADS - Use x threads
 	// Threads = x > MAX_THREADS  - Use MAX_THREADS threads
-	FPGrowth(Transactions& transactions, const Support minSupport = 1, const uint32_t minPatternLen = 1, const uint32_t maxPatternLen = 0, const ItemC winLen = 20, const int32_t threads = 0) :
+	FPGrowth(Transactions& transactions, const Support minSupport = 1, const uint32_t minPatternLen = 1, const uint32_t maxPatternLen = 0, const ItemC winLen = 20, const uint32_t maxc = -1, const uint32_t minneu = 1, const int32_t threads = 0) :
 		m_minSupport(minSupport),
 		m_minPatternLen(minPatternLen),
 		m_maxPatternLen(maxPatternLen),
 		m_winLen(winLen),
+		m_maxSupport(maxc),
+		m_minNeuronCount(minneu),
 		m_tree(nullptr),
 		m_maxItemCnt(0),
 		m_objs(1),
@@ -426,14 +428,14 @@ private:
 		}
 	}
 
-	void pp(Pattern& results, const ItemID* pIDs, const std::size_t& size, const std::size_t& pos, const std::size_t& minLen, PatternType* pBase, PatternType basePos, const Support& supp, const ItemC* pId2Item, const std::size_t& minPatternLength, const ItemC& winLen)
+	void pp(Pattern& results, const ItemID* pIDs, const std::size_t& size, const std::size_t& pos, const std::size_t& minLen, PatternType* pBase, PatternType basePos, const Support& supp, const ItemC* pId2Item, const Support& maxSupport, const std::size_t& minNeuronCount, const ItemC& winLen)
 	{
 		pBase[basePos++] = m_pId2Item[pIDs[pos]];
 		for (std::size_t i = pos + 1; i < size; i++)
-			pp(results, pIDs, size, i, minLen, pBase, basePos, supp, pId2Item, minPatternLength, winLen);
+			pp(results, pIDs, size, i, minLen, pBase, basePos, supp, pId2Item, maxSupport, minNeuronCount, winLen);
 
 		if (basePos >= minLen)
-			results.AddPattern(basePos, supp, pBase, pId2Item, minPatternLength, winLen);
+			results.AddPattern(basePos, supp, pBase, pId2Item, maxSupport, minNeuronCount, winLen);
 	}
 
 	void endLocalPattern(const int32_t& tId, const int64_t& pId, const ItemID& item)
@@ -452,15 +454,15 @@ private:
 #ifdef PERF_EXT_EXPANSION
 				// TODO: Add maxPatternLength
 				for (std::size_t i = 0; i < m_pDataObjs[tId].m_perfExtIDCnt; i++)
-					pp(m_pPattern[pId], m_pDataObjs[tId].m_pPerfExtIDs, m_pDataObjs[tId].m_perfExtIDCnt, i, m_minPatternLen, m_pDataObjs[tId].m_pPatternBase, static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s, GetId2Item(), m_minPatternLen, m_winLen);
+					pp(m_pPattern[pId], m_pDataObjs[tId].m_pPerfExtIDs, m_pDataObjs[tId].m_perfExtIDCnt, i, m_minPatternLen, m_pDataObjs[tId].m_pPatternBase, static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s, GetId2Item(), m_maxSupport, m_minNeuronCount, m_winLen);
 
 				if (m_pDataObjs[tId].m_lastIDCnt >= m_minPatternLen && (m_maxPatternLen == 0 || m_pDataObjs[tId].m_lastIDCnt <= m_maxPatternLen))
-					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s, m_pDataObjs[tId].m_pPatternBase, GetId2Item(), m_minPatternLen, m_winLen);
+					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt), s, m_pDataObjs[tId].m_pPatternBase, GetId2Item(), m_maxSupport, m_minNeuronCount, m_winLen);
 
 #else
 				for (std::size_t i = m_pDataObjs[tId].m_lastIDCnt; i < m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt; i++)
 					m_pDataObjs[tId].m_pPatternBase[i] = m_pDataObjs[tId].m_pPerfExtIDs[i - m_pDataObjs[tId].m_lastIDCnt] | (static_cast<ItemID>(0) << 32);
-				m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase, GetId2Item(), static_cast<std::size_t>(m_minPatternLen), m_winLen);
+				m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase, GetId2Item(), static_cast<Support>(m_maxSupport), static_cast<std::size_t>(m_minNeuronCount), m_winLen);
 #endif
 #else // Only extract closed pattern
 				Support r = m_pClosedDetect->GetSupport();
@@ -759,6 +761,8 @@ private:
 	uint32_t m_minPatternLen;
 	uint32_t m_maxPatternLen;
 	ItemC m_winLen;
+	uint32_t m_maxSupport;
+	uint32_t m_minNeuronCount;
 	FPTree* m_tree;
 	std::size_t m_maxItemCnt;
 	int32_t m_objs;
