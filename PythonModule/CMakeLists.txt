@@ -10,6 +10,7 @@ message(STATUS "Build Mode: ${CMAKE_BUILD_TYPE}")
 
 option(USE_OPENMP "Build the project with OpenMP support" ON)
 option(USE_MPI "Build the project with MPI support" OFF)
+option(EVAL_MODE "Build the project in eval mode, disabling most printing" OFF)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,6 +26,11 @@ if (USE_MPI)
   find_package(MPI REQUIRED)
   add_definitions(-DUSE_MPI)
   include_directories(SYSTEM ${MPI_INCLUDE_PATH})
+endif()
+
+if (EVAL_MODE)
+  add_definitions(-DEVAL_MODE)
+  message(STATUS "Eval Mode enabled")
 endif()
 
 find_package(PythonLibs COMPONENTS Development REQUIRED)

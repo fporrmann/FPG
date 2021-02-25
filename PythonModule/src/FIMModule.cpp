@@ -66,7 +66,7 @@
 
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 4
-#define PATCH_VERSION 0
+#define PATCH_VERSION 1
 
 #define VERSION              \
 	TO_STRING(MAJOR_VERSION) \
@@ -247,10 +247,11 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	{
 		FPGrowth fp(transactions, support, zmin, zmax, static_cast<ItemC>(winlen), maxc, minneu, threads);
 		const Pattern* pPattern = fp.Growth();
-		LOG_INFO << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
+		if(pPattern == nullptr) Py_RETURN_NONE;
+		LOG_INFO_EVAL << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
 
 		ClosedDetection(fp, pPattern, closed);
-		LOG_INFO << "Memory Usage after Closed Detection: " << GetMemString() << std::endl;
+		LOG_INFO_EVAL << "Memory Usage after Closed Detection: " << GetMemString() << std::endl;
 	}
 	catch (const FPGException& e)
 	{
@@ -260,7 +261,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		return nullptr;
 	}
 
-	LOG_INFO << "Converting Pattern to Python List ... " << std::flush;
+	LOG_INFO_EVAL << "Converting Pattern to Python List ... " << std::flush;
 	Timer t;
 	t.Start();
 
@@ -289,11 +290,11 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		}
 
 		t.Stop();
-		LOG_INFO << "Done after: " << t << std::endl;
-		LOG_INFO << "Memory Usage after Conmversion: " << GetMemString() << std::endl;
+		LOG_INFO_EVAL << "Done after: " << t << std::endl;
+		LOG_INFO_EVAL << "Memory Usage after Conmversion: " << GetMemString() << std::endl;
 
 		fullTimer.Stop();
-		LOG_INFO << " =========  FPGrowth C++ Module End (" << fullTimer << ")  ========= " << std::endl;
+		LOG_INFO_EVAL << " =========  FPGrowth C++ Module End (" << fullTimer << ")  ========= " << std::endl;
 
 		sigRemove();
 		return pyList;

@@ -313,7 +313,7 @@ public:
 		if (!growthTop(m_tree)) return nullptr;
 
 		t.Stop();
-		LOG_INFO << "\x1B[31mRuntime:\x1B[0m " << t + m_initTime << " - Frequent Item-Sets: " << GetPatternCount() << std::endl;
+		LOG_INFO_EVAL << "\x1B[31mRuntime:\x1B[0m " << t + m_initTime << " - Frequent Item-Sets: " << GetPatternCount() << std::endl;
 		return m_pPattern;
 	}
 
@@ -525,6 +525,7 @@ private:
 	bool growthTop(FPTree* pTree)
 	{
 #ifdef USE_MPI
+		const int ROOT_RANK = 0;
 		int rank;
 		int procs;
 		MPI_Init(NULL, NULL);
@@ -532,7 +533,7 @@ private:
 		MPI_Comm_size(MPI_COMM_WORLD, &procs);
 		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-		std::cout << "PROCS: " << procs << " | Rank: " << rank << std::endl;
+		LOG_VERBOSE << "PROCS: " << procs << " | Rank: " << rank << std::endl;
 #endif
 
 		FPTree** ppDst = new FPTree*[m_objs]();
@@ -596,12 +597,20 @@ private:
 			endLocalPattern(tId, i, pH->item);
 
 			EndPattern(tId, pH->item);
+
+#ifdef USE_MPI
+			if (rank == ROOT_RANK)
+			{
+#endif
 #ifdef ALL_PATTERN
-			if (tId == 0)
-				LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
+				if (tId == 0)
+					LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
 #else
-			if (tId == 0)
-				LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
+				if (tId == 0 && rank == ROOT_RANK)
+					LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
+#endif
+#ifdef USE_MPI
+			}
 #endif
 		}
 
@@ -610,10 +619,12 @@ private:
 
 		delete[] ppDst;
 
-		LOG_INFO << "\r" << pTree->cnt << " / " << pTree->cnt << " Done" << std::endl;
+#ifdef USE_MPI
+		if(rank == ROOT_RANK)
+#endif
+			LOG_INFO << "\r" << pTree->cnt << " / " << pTree->cnt << " Done" << std::endl;
 
 #ifdef USE_MPI
-		const int ROOT_RANK = 0;
 		const int MSG_TAG   = 0;
 
 		if (rank == ROOT_RANK)
@@ -641,11 +652,11 @@ private:
 					for (int k = 0; k < dataCnt; k += data[k] + Pattern::OFFSET)
 						m_pPattern[j * procs + i].AddPattern(data[k], data[k + 1], &data[k + 2]);
 				}
-				std::cout << "Recieved " << procResCnt << " values from Rank: " << i << std::endl;
+				LOG_VERBOSE << "Recieved " << procResCnt << " values from Rank: " << i << std::endl;
 				fullCnt += procResCnt;
 			}
 			comTime.Stop();
-			std::cout << "Merged all results in Rank: " << ROOT_RANK << " final count: " << fullCnt << " Done after: " << comTime << std::endl;
+			LOG_INFO_EVAL << "Merged all results in Rank: " << ROOT_RANK << " final count: " << fullCnt << " Done after: " << comTime << std::endl;
 		}
 		else
 		{
@@ -897,13 +908,13 @@ void ClosedDetection(const FPGrowth& fp, const Pattern* pPattern, std::vector<Pa
 	const ItemC* pId2Item       = fp.GetId2Item();
 	if (fp.GetPatternCount() == 0)
 	{
-		LOG_VERBOSE << "No itemsets provided, skipping Closed Detection" << std::endl;
+		LOG_INFO_EVAL << "No itemsets provided, skipping Closed Detection" << std::endl;
 		return;
 	}
 
 	Timer timer;
 
-	LOG_VERBOSE << "Closed Detection ... " << std::flush;
+	LOG_INFO_EVAL << "Closed Detection ... " << std::flush;
 
 	timer.Start();
 
@@ -936,6 +947,9 @@ void ClosedDetection(const FPGrowth& fp, const Pattern* pPattern, std::vector<Pa
 
 			for (int32_t i = 0; i < k; i++)
 			{
+#ifdef WITH_SIG_TERM
+				if (sigAborted()) throw(FPGException("CTRL-C abort"));
+#endif
 				// TODO: Probably can start at 1 here
 				if (pItems[i] != (pp[Pattern::DATA_IDX + i] & 0xFFFFFFFF))
 				{
@@ -952,6 +966,9 @@ void ClosedDetection(const FPGrowth& fp, const Pattern* pPattern, std::vector<Pa
 
 			for (PatternType p = 0; p < pp[Pattern::LEN_IDX]; p++)
 			{
+#ifdef WITH_SIG_TERM
+				if (sigAborted()) throw(FPGException("CTRL-C abort"));
+#endif
 				PatternType i = pp[Pattern::DATA_IDX + p];
 				Support supp  = i >> 32;
 				ItemID item   = i & 0xFFFFFFFF;
@@ -1025,6 +1042,6 @@ void ClosedDetection(const FPGrowth& fp, const Pattern* pPattern, std::vector<Pa
 	delete[] pAdded;
 
 	timer.Stop();
-	LOG_VERBOSE << "Done after: " << timer << std::endl;
+	LOG_INFO_EVAL << "Done after: " << timer << std::endl;
 	LOG_INFO << "Closed Pattern: " << closed.size() << std::endl;
 }
