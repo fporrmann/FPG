@@ -488,7 +488,7 @@ private:
 #endif
 
 					m_pClosedDetect->Update(m_pDataObjs[tId].m_pCMem, k, s);
-					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase, s, GetId2Item(), m_minPatternLen, m_winLen);
+					m_pPattern[pId].AddPattern(static_cast<ItemC>(m_pDataObjs[tId].m_lastIDCnt + m_pDataObjs[tId].m_perfExtIDCnt), s, m_pDataObjs[tId].m_pPatternBase, GetId2Item(), static_cast<Support>(m_maxSupport), static_cast<std::size_t>(m_minNeuronCount), m_winLen);
 #ifdef DEBUG
 					LOG_DEBUG << std::endl
 							  << std::endl;
@@ -569,7 +569,7 @@ private:
 #ifdef ALL_PATTERN
 		for (int64_t i = start; i < end; i += inc)
 #else
-		for (int64_t i = itrEnd - 1; i >= itrStart; i--)
+		for (int64_t i = end - 1; i >= start; i -= inc)
 #endif
 		{
 #ifdef USE_OPENMP
@@ -606,8 +606,8 @@ private:
 				if (tId == 0)
 					LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
 #else
-				if (tId == 0 && rank == ROOT_RANK)
-					LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
+			if (tId == 0)
+				LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
 #endif
 #ifdef USE_MPI
 			}
@@ -620,12 +620,12 @@ private:
 		delete[] ppDst;
 
 #ifdef USE_MPI
-		if(rank == ROOT_RANK)
+		if (rank == ROOT_RANK)
 #endif
 			LOG_INFO << "\r" << pTree->cnt << " / " << pTree->cnt << " Done" << std::endl;
 
 #ifdef USE_MPI
-		const int MSG_TAG   = 0;
+		const int MSG_TAG = 0;
 
 		if (rank == ROOT_RANK)
 		{
