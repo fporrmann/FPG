@@ -176,7 +176,7 @@ public:
 		const PatternType* pEnd   = pData + patternLength;
 		if (std::any_of(pStart, pEnd, [&winLen, &pId2Item](const PatternType& i) { return ((pId2Item[i & 0xFFFFFFFF]) % winLen) == 0; }))
 		{
-			if(support <= maxSupport)
+			if (support <= maxSupport)
 			{
 				std::set<PatternType> v;
 				std::transform(pStart, pEnd, std::inserter(v, std::begin(v)), [&winLen, &pId2Item](const PatternType& i) { return (pId2Item[i & 0xFFFFFFFF]) / winLen; });
@@ -187,12 +187,12 @@ public:
 					pPattern[SUPP_IDX]    = support;       // Set pattern support
 					// Set pattern data
 					std::memcpy(pPattern + OFFSET, pData, patternLength * sizeof(PatternType));
-	#ifdef DEBUG
+#ifdef DEBUG
 					LOG_DEBUG << "Adding Pattern: " << std::flush;
 					for (PatternType i = 0; i < patternLength; i++)
 						LOG_DEBUG << (char)pData[i] << " ";
 					LOG_DEBUG << "(" << support << ")" << std::endl;
-	#endif
+#endif
 					m_patternCnt++;
 				}
 			}

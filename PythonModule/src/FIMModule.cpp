@@ -38,6 +38,7 @@
 
 #include "FPGrowth.h"
 #include "Logger.h"
+#include "SigTerm.h"
 #include "Utils.h"
 
 #define MAKE_NAME(x)      PyInit_##x
@@ -64,9 +65,17 @@
 		PyErr_SetString(PyExc_RuntimeError, "user abort"); \
 	}
 
+#define EXIT_INTERRUPT()      \
+	{                         \
+		sigAbort(0);          \
+		PyErr_SetInterrupt(); \
+		ERR_ABORT();          \
+		return nullptr;       \
+	}
+
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 4
-#define PATCH_VERSION 1
+#define PATCH_VERSION 2
 
 #define VERSION              \
 	TO_STRING(MAJOR_VERSION) \
@@ -204,6 +213,11 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 	while ((pTransItr = PyIter_Next(pTractsItr)) != nullptr)
 	{
+#ifdef WITH_SIG_TERM
+		if (sigAborted())
+			EXIT_INTERRUPT();
+#endif
+
 		pItemItr = PyObject_GetIter(pTransItr);
 		cleanupPyRefs({ pTransItr });
 
@@ -217,6 +231,11 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		Transaction tc;
 		while ((pItem = PyIter_Next(pItemItr)) != nullptr)
 		{
+#ifdef WITH_SIG_TERM
+			if (sigAborted())
+				EXIT_INTERRUPT();
+#endif
+
 			Py_hash_t h = PyObject_Hash(pItem);
 			if (h == -1)
 			{
@@ -247,7 +266,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	{
 		FPGrowth fp(transactions, support, zmin, zmax, static_cast<ItemC>(winlen), maxc, minneu, threads);
 		const Pattern* pPattern = fp.Growth();
-		if(pPattern == nullptr) Py_RETURN_NONE;
+		if (pPattern == nullptr) Py_RETURN_NONE;
 		LOG_INFO_EVAL << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
 
 		ClosedDetection(fp, pPattern, closed);
@@ -255,10 +274,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	}
 	catch (const FPGException& e)
 	{
-		sigAbort(0);
-		PyErr_SetInterrupt();
-		ERR_ABORT();
-		return nullptr;
+		EXIT_INTERRUPT();
 	}
 
 	LOG_INFO_EVAL << "Converting Pattern to Python List ... " << std::flush;
@@ -273,11 +289,21 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 		for (auto [idx, pp] : enumerate(closed))
 		{
+#ifdef WITH_SIG_TERM
+			if (sigAborted())
+				EXIT_INTERRUPT();
+#endif
+
 			pyPatternWSupp = createPyTuple(2);
 			pyPattern      = createPyTuple(pp.first.size());
 
 			for (auto [i, item] : enumerate(pp.first))
 			{
+#ifdef WITH_SIG_TERM
+				if (sigAborted())
+					EXIT_INTERRUPT();
+#endif
+
 				PyObject* pItem = hashMap[item];
 				Py_INCREF(pItem);
 				PyTuple_SET_ITEM(pyPattern, i, pItem);

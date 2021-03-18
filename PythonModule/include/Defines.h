@@ -32,4 +32,3 @@
 //#define MEMORY_VERBOSE
 
 // #define USE_OPENMP
-
