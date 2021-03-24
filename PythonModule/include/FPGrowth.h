@@ -157,6 +157,8 @@ public:
 		m_objs = omp_get_max_threads();
 		if (threads == 0 || threads > 1)
 			LOG_INFO << "Number of Threads: " << m_objs << std::endl;
+#else
+		UNUSED(threads);
 #endif
 
 		m_pDataObjs  = new DataObjs[m_objs]();
@@ -556,6 +558,7 @@ private:
 		int64_t start = 0;
 		int64_t end   = static_cast<int64_t>(pTree->cnt);
 		int64_t inc   = 1;
+		bool error    = false;
 
 #ifdef USE_MPI
 		const int64_t iterationsPerProc = static_cast<int64_t>(pTree->cnt / procs);
@@ -591,28 +594,42 @@ private:
 			else if (ppDst[tId])
 			{
 				if (project(tId, ppDst[tId], pTree, i))
-					growth(tId, i, ppDst[tId]);
+				{
+					// Use boolean return because throwing exceptions
+					// in a multi-threaded setup results in forceful
+					// termination of the application
+					if (!growth(tId, i, ppDst[tId]))
+					{
+						error = true;
+						i     = end;
+					}
+				}
 			}
 
-			endLocalPattern(tId, i, pH->item);
+			if (!error)
+			{
+				endLocalPattern(tId, i, pH->item);
 
-			EndPattern(tId, pH->item);
+				EndPattern(tId, pH->item);
 
 #ifdef USE_MPI
-			if (rank == ROOT_RANK)
-			{
+				if (rank == ROOT_RANK)
+				{
 #endif
 #ifdef ALL_PATTERN
-				if (tId == 0)
-					LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
+					if (tId == 0)
+						LOG_INFO << "\r" << i + 1 << " / " << pTree->cnt << " Done" << std::flush;
 #else
-			if (tId == 0)
-				LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
+				if (tId == 0)
+					LOG_INFO << "\r" << pTree->cnt - i << " / " << pTree->cnt << " Done" << std::flush;
 #endif
 #ifdef USE_MPI
-			}
+				}
 #endif
+			}
 		}
+
+		if (error) throw(FPGException("Ctrl-C Interrupt"));
 
 		for (int32_t i = 0; i < m_objs; i++)
 			if (ppDst[i]) delete (ppDst[i]);
@@ -680,7 +697,7 @@ private:
 		return true;
 	}
 
-	void growth(const int32_t& tId, const int64_t& pId, FPTree* pTree)
+	bool growth(const int32_t& tId, const int64_t& pId, FPTree* pTree)
 	{
 		FPTree* pDst  = nullptr;
 		FPHead* pH    = nullptr;
@@ -688,7 +705,7 @@ private:
 		FPNode* pAnc  = nullptr;
 
 #ifdef WITH_SIG_TERM
-		if (sigAborted()) throw(FPGException("CTRL-C abort"));
+		if (sigAborted()) return false; //throw(FPGException("CTRL-C abort"));
 #endif
 
 		if (pTree->cnt > 1)
@@ -716,7 +733,10 @@ private:
 			else if (pDst)
 			{
 				if (project(tId, pDst, pTree, i))
-					growth(tId, pId, pDst);
+				{
+					if (!growth(tId, pId, pDst))
+						return false;
+				}
 			}
 
 			endLocalPattern(tId, pId, pH->item);
@@ -724,6 +744,7 @@ private:
 
 		pTree->pMemory->PopState();
 		if (pDst) delete (pDst);
+		return true;
 	}
 
 	FrequencyMap getFrequency(const Transactions& transactions)

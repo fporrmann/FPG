@@ -31,7 +31,9 @@
 #include <map>
 #include <stdio.h>
 #include <string>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
 #include <unistd.h>
 
 #include <Python.h>
@@ -75,7 +77,7 @@
 
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 4
-#define PATCH_VERSION 2
+#define PATCH_VERSION 3
 
 #define VERSION              \
 	TO_STRING(MAJOR_VERSION) \
@@ -104,7 +106,7 @@ static struct PyModuleDef ModuleDefinitions = {
 	PyModuleDef_HEAD_INIT,
 	TO_STRING(MODULE_NAME), // Name of the Module
 	// Module documentation (docstring)
-	"C++-based FPGrowth implementation for python3.6",
+	"C++-based FPGrowth implementation for python3",
 	-1,
 	ModuleFunctions // Functions exposed to the module
 };

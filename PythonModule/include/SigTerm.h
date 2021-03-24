@@ -30,15 +30,13 @@
 #include <signal.h>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
 #define NOMINMAX // Disable the build in MIN/MAX macros to prevent collisions
+#endif
 #include <windows.h>
 #else
 #define _POSIX_C_SOURCE 200809L
 #endif
-
-
-
-
 
 #ifdef WITH_SIG_TERM
 static volatile sig_atomic_t aborted = 0;
@@ -56,7 +54,7 @@ void sigAbort(const int& state)
 
 static BOOL WINAPI sigHandler(DWORD type)
 {
-	if (type == SIGINT)
+	if (type == CTRL_C_EVENT || type == CTRL_CLOSE_EVENT || type == CTRL_LOGOFF_EVENT || type == CTRL_SHUTDOWN_EVENT)
 		sigAbort(-1);
 	return TRUE;
 }
@@ -65,7 +63,6 @@ void sigInstall()
 {
 	SetConsoleCtrlHandler(sigHandler, TRUE);
 }
-
 
 void sigRemove()
 {
@@ -83,7 +80,7 @@ static void sigHandler(int type)
 void sigInstall()
 {
 	sigNew.sa_handler = sigHandler;
-	sigNew.sa_flags = 0;
+	sigNew.sa_flags   = 0;
 	sigemptyset(&sigNew.sa_mask);
 	sigaction(SIGINT, &sigNew, &sigOld);
 }
@@ -99,5 +96,3 @@ int sigAborted()
 	return aborted;
 }
 #endif
-
-

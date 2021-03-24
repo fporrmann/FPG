@@ -355,7 +355,9 @@ static inline std::string SizeWithSuffix(const int64_t& val)
 // //////////////////////////////////////
 
 #ifdef _WIN32
+#ifndef NOMINMAX
 #define NOMINMAX // Disable the build in MIN/MAX macros to prevent collisions
+#endif
 #include <windows.h>
 #include <psapi.h>
 #endif

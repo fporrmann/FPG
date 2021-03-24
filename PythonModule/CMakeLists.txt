@@ -15,6 +15,11 @@ option(EVAL_MODE "Build the project in eval mode, disabling most printing" OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (WIN32)
+  # Windows library for memory utilization
+  find_library(PSAPI Psapi)
+endif()
+
 if (USE_OPENMP)
   find_package(OpenMP REQUIRED)
   add_definitions(-DUSE_OPENMP)
@@ -41,6 +46,12 @@ file(GLOB src "src/*.cpp")
 add_library(${PROJECT_NAME} SHARED ${src})
 set_target_properties(${PROJECT_NAME} PROPERTIES PREFIX "") # disable the "lib" prefix
 
+if (WIN32)
+  # Change the extension from .dll to .pyd on Windows
+  set(CMAKE_SHARED_LIBRARY_SUFFIX ".pyd")
+  target_link_libraries(${PROJECT_NAME} PUBLIC ${PSAPI})
+endif()
+
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON) # enable fPIC
 
 if (OPENMP_FOUND)
@@ -50,6 +61,8 @@ endif()
 if (MPI_FOUND)
   target_link_libraries(${PROJECT_NAME} PRIVATE ${MPI_CXX_LIBRARIES})
 endif()
+
+target_link_libraries(${PROJECT_NAME} PUBLIC ${PYTHON_LIBRARIES})
 
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
