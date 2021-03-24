@@ -90,7 +90,7 @@ DEFINE_EXCEPTION(ModuleException)
 PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds);
 
 static PyMethodDef ModuleFunctions[] = {
-	{ "fpgrowth", reinterpret_cast<PyCFunction>(fpgrowth), METH_VARARGS | METH_KEYWORDS, nullptr },
+	{ "fpgrowth", (PyCFunction)fpgrowth, METH_VARARGS | METH_KEYWORDS, nullptr },
 	{ nullptr, nullptr, 0, nullptr }
 };
 
