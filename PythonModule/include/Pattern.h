@@ -26,8 +26,8 @@
 
 #pragma once
 
-#include "Types.h"
 #include "Logger.h"
+#include "Types.h"
 #include "Utils.h"
 
 #include <iostream>
@@ -39,8 +39,8 @@ class Pattern
 	static constexpr std::size_t BLOCK_SIZE = 16384;
 
 public:
-	static constexpr PatternType OFFSET = 2;
-	static constexpr PatternType LEN_IDX = 0;
+	static constexpr PatternType OFFSET   = 2;
+	static constexpr PatternType LEN_IDX  = 0;
 	static constexpr PatternType SUPP_IDX = 1;
 	static constexpr PatternType DATA_IDX = 2;
 
@@ -64,13 +64,11 @@ public:
 	template<typename T>
 	class iterator
 	{
-	DISABLE_COPY_ASSIGN_MOVE(iterator)
+		DISABLE_COPY_ASSIGN_MOVE(iterator)
 	public:
 		using ValueType = T;
 		using Reference = T&;
-		using Pointer = T*;
-
-
+		using Pointer   = T*;
 
 		explicit iterator(std::vector<PatternType*> mem, const std::size_t& maxBlocks, PatternType* pItr = nullptr) :
 			m_idx(0),
@@ -83,7 +81,10 @@ public:
 				m_pItr = m_mem[m_block];
 		}
 
-		bool operator != (const iterator& other) const { return m_pItr != other.m_pItr; }
+		bool operator!=(const iterator& other) const
+		{
+			return m_pItr != other.m_pItr;
+		}
 		iterator& operator++()
 		{
 			m_idx += m_pItr[LEN_IDX] + OFFSET;
@@ -117,12 +118,17 @@ public:
 		PatternType* m_pItr;
 	};
 
-	using Iterator = iterator<PatternType>;
+	using Iterator      = iterator<PatternType>;
 	using ConstIterator = iterator<const PatternType>;
 
 	const std::size_t& GetCount() const
 	{
 		return m_patternCnt;
+	}
+
+	bool Empty() const
+	{
+		return m_patternCnt == 0;
 	}
 
 	Iterator begin()
@@ -149,8 +155,8 @@ public:
 	{
 		PatternType* pPattern = getNextPattern(patternLength);
 
-		pPattern[LEN_IDX] = patternLength; // Set pattern length
-		pPattern[SUPP_IDX] = support; // Set pattern support
+		pPattern[LEN_IDX]  = patternLength; // Set pattern length
+		pPattern[SUPP_IDX] = support;       // Set pattern support
 		// Set pattern data
 		std::memcpy(pPattern + OFFSET, pData, patternLength * sizeof(PatternType));
 
@@ -162,6 +168,35 @@ public:
 #endif
 
 		m_patternCnt++;
+	}
+
+	void AddPattern(const PatternType& patternLength, const Support& support, PatternType* pData, const ItemC* pId2Item, const Support& maxSupport, const std::size_t& minNeuronCount, const ItemC& winLen)
+	{
+		const PatternType* pStart = pData;
+		const PatternType* pEnd   = pData + patternLength;
+		if (std::any_of(pStart, pEnd, [&winLen, &pId2Item](const PatternType& i) { return ((pId2Item[i & 0xFFFFFFFF]) % winLen) == 0; }))
+		{
+			if (support <= maxSupport)
+			{
+				std::set<PatternType> v;
+				std::transform(pStart, pEnd, std::inserter(v, std::begin(v)), [&winLen, &pId2Item](const PatternType& i) { return (pId2Item[i & 0xFFFFFFFF]) / winLen; });
+				if (v.size() >= minNeuronCount)
+				{
+					PatternType* pPattern = getNextPattern(patternLength);
+					pPattern[LEN_IDX]     = patternLength; // Set pattern length
+					pPattern[SUPP_IDX]    = support;       // Set pattern support
+					// Set pattern data
+					std::memcpy(pPattern + OFFSET, pData, patternLength * sizeof(PatternType));
+#ifdef DEBUG
+					LOG_DEBUG << "Adding Pattern: " << std::flush;
+					for (PatternType i = 0; i < patternLength; i++)
+						LOG_DEBUG << (char)pData[i] << " ";
+					LOG_DEBUG << "(" << support << ")" << std::endl;
+#endif
+					m_patternCnt++;
+				}
+			}
+		}
 	}
 
 private:
@@ -201,4 +236,3 @@ private:
 	std::vector<PatternType*> m_mem;
 	PatternType* m_pEndPtr;
 };
-

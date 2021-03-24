@@ -29,6 +29,7 @@
 #include "Types.h"
 #include "Logger.h"
 #include "FPNode.h"
+#include "Utils.h"
 
 #include <iostream>
 #include <sstream>

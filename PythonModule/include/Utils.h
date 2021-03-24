@@ -34,7 +34,8 @@
 #include <memory>
 #include <exception>
 #include <iostream>
-
+#include <cmath>
+#include <unistd.h>
 
 #define CLASS_TAG(_C_) "[" << _C_ << "::" << __func__ << "] "
 
@@ -354,7 +355,9 @@ static inline std::string SizeWithSuffix(const int64_t& val)
 // //////////////////////////////////////
 
 #ifdef _WIN32
+#ifndef NOMINMAX
 #define NOMINMAX // Disable the build in MIN/MAX macros to prevent collisions
+#endif
 #include <windows.h>
 #include <psapi.h>
 #endif

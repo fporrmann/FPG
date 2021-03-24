@@ -24,66 +24,89 @@
  *  
  */
 
-#include <iostream>
-#include <string>
+#include <fstream>
 #include <functional>
 #include <iomanip>
-#include <fstream>
-#include <unistd.h>
-#include <stdio.h>
+#include <iostream>
 #include <map>
+#include <stdio.h>
+#include <string>
+#ifndef _WIN32
 #include <sys/resource.h>
+#endif
+#include <unistd.h>
 
 #include <Python.h>
 
 #include "FPGrowth.h"
-#include "Utils.h"
 #include "Logger.h"
+#include "SigTerm.h"
+#include "Utils.h"
 
-#define MAKE_NAME(x) PyInit_##x
+#define MAKE_NAME(x)      PyInit_##x
 #define INIT_FUNC_NAME(x) MAKE_NAME(x)
 
 #define STRINGIFY(x) #x
 #define TO_STRING(x) STRINGIFY(x)
 
-#define ERR_TYPE(s) { sigRemove(); PyErr_SetString(PyExc_TypeError, s); }
-#define ERR_MEM(s)  { sigRemove(); PyErr_SetString(PyExc_MemoryError, s); }
-#define ERR_ABORT() { sigRemove(); PyErr_SetString(PyExc_RuntimeError, "user abort"); }
+#define ERR_TYPE(s)                          \
+	{                                        \
+		sigRemove();                         \
+		PyErr_SetString(PyExc_TypeError, s); \
+	}
+
+#define ERR_MEM(s)                             \
+	{                                          \
+		sigRemove();                           \
+		PyErr_SetString(PyExc_MemoryError, s); \
+	}
+
+#define ERR_ABORT()                                        \
+	{                                                      \
+		sigRemove();                                       \
+		PyErr_SetString(PyExc_RuntimeError, "user abort"); \
+	}
+
+#define EXIT_INTERRUPT()      \
+	{                         \
+		sigAbort(0);          \
+		PyErr_SetInterrupt(); \
+		ERR_ABORT();          \
+		return nullptr;       \
+	}
 
 #define MAJOR_VERSION 0
-#define MINOR_VERSION 2
-#define PATCH_VERSION 0
+#define MINOR_VERSION 4
+#define PATCH_VERSION 3
 
-#define VERSION TO_STRING(MAJOR_VERSION) "." TO_STRING(MINOR_VERSION) "." TO_STRING(PATCH_VERSION)
-
+#define VERSION              \
+	TO_STRING(MAJOR_VERSION) \
+	"." TO_STRING(MINOR_VERSION) "." TO_STRING(PATCH_VERSION)
 
 DEFINE_EXCEPTION(ModuleException)
-
 
 // =========  Python Module Setup  ======== //
 
 PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds);
 
-static PyMethodDef ModuleFunctions [] =
-{
-	{"fpgrowth", reinterpret_cast<PyCFunction>(fpgrowth), METH_VARARGS|METH_KEYWORDS, nullptr},
-	{nullptr, nullptr, 0, nullptr}
+static PyMethodDef ModuleFunctions[] = {
+	{ "fpgrowth", reinterpret_cast<PyCFunction>(fpgrowth), METH_VARARGS | METH_KEYWORDS, nullptr },
+	{ nullptr, nullptr, 0, nullptr }
 };
 
 // Disable the missing-field-initializers warning as some
-// sub states of PyModuleDef won't be initialized here 
+// sub states of PyModuleDef won't be initialized here
 #if !defined(_MSC_VER) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
 // Module definition
-static struct PyModuleDef ModuleDefinitions =
-{
+static struct PyModuleDef ModuleDefinitions = {
 	PyModuleDef_HEAD_INIT,
 	TO_STRING(MODULE_NAME), // Name of the Module
 	// Module documentation (docstring)
-	"C++-based FPGrowth implementation for python3.6",
+	"C++-based FPGrowth implementation for python3",
 	-1,
 	ModuleFunctions // Functions exposed to the module
 };
@@ -96,7 +119,7 @@ PyMODINIT_FUNC INIT_FUNC_NAME(MODULE_NAME)(void)
 {
 	Py_Initialize();
 	PyObject* pModule = PyModule_Create(&ModuleDefinitions);
-	PyModule_AddObject(pModule, "version", Py_BuildValue("s", "version 0.1-Alpha"));
+	PyModule_AddObject(pModule, "version", Py_BuildValue("s", "version 0.3-Alpha"));
 	return pModule;
 }
 
@@ -105,14 +128,14 @@ PyMODINIT_FUNC INIT_FUNC_NAME(MODULE_NAME)(void)
 PyObject* long2PyLong(const long& val)
 {
 	PyObject* pyVal = PyLong_FromLong(val);
-	if(!pyVal) throw(ModuleException("Unable to allocate memory for Python Long element"));
+	if (!pyVal) throw(ModuleException("Unable to allocate memory for Python Long element"));
 	return pyVal;
 }
 
 PyObject* createPyList(const size_t& size = 0)
 {
 	PyObject* pyList = PyList_New(size);
-	if(!pyList)
+	if (!pyList)
 		throw(ModuleException(string_format("Unable to allocate memory for Python List with %lld elements", size)));
 
 	return pyList;
@@ -121,19 +144,17 @@ PyObject* createPyList(const size_t& size = 0)
 PyObject* createPyTuple(const size_t& size = 0)
 {
 	PyObject* pyTuple = PyTuple_New(size);
-	if(!pyTuple)
+	if (!pyTuple)
 		throw(ModuleException(string_format("Unable to allocate memory for Python Tuple with %lld elements", size)));
 
 	return pyTuple;
 }
 
-
 void cleanupPyRefs(std::initializer_list<PyObject*> objs)
 {
-	for(PyObject* pObj : objs)
+	for (PyObject* pObj : objs)
 		Py_DECREF(pObj);
 }
-
 
 // =========  Python Module Functions  ======== //
 
@@ -142,17 +163,20 @@ static constexpr ItemC WIN_LEN = 20;
 PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 {
 	UNUSED(self);
-	const char* ckwds[] = { "tracts", "target", "supp", "zmin", "zmax", "report", "algo", "winlen", "verbose", nullptr };
+	const char* ckwds[] = { "tracts", "target", "supp", "zmin", "zmax", "report", "algo", "winlen", "max_c", "min_neu", "verbose", "threads", nullptr };
 	PyObject* tracts;
-	char* target = nullptr;
-	double supp = 10;
+	char* target    = nullptr;
+	double supp     = 10;
 	Support support = 0;
-	uint32_t zmin = 1;
-	uint32_t zmax = 0;
-	char* report = nullptr;
-	char* algo = nullptr;
+	uint32_t zmin   = 1;
+	uint32_t zmax   = 0;
+	uint32_t maxc   = -1;
+	uint32_t minneu = 1;
+	char* report    = nullptr;
+	char* algo      = nullptr;
 	uint32_t winlen = WIN_LEN;
 	int32_t verbose = ToUnderlying(Verbosity::VB_INFO);
+	int32_t threads = 1;
 	Verbosity verbosity;
 	Timer fullTimer;
 
@@ -161,10 +185,12 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	fullTimer.Start();
 
 	// ===== Evaluate the Function Arguments ===== //
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|sdIIssII", const_cast<char**>(ckwds), &tracts, &target, &supp, &zmin, &zmax, &report, &algo, &winlen, &verbose))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|sdIIssIIIII", const_cast<char**>(ckwds), &tracts, &target, &supp, &zmin, &zmax, &report, &algo, &winlen, &maxc, &minneu, &verbose, &threads))
 		return nullptr;
 
-	support = static_cast<Support>(std::abs(supp));
+	if (threads < -1) threads = -1;
+
+	support   = static_cast<Support>(std::abs(supp));
 	verbosity = ToVerbosity(verbose);
 
 	SetVerbosity(verbosity);
@@ -182,7 +208,6 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		return nullptr;
 	}
 
-
 	PyObject* pTransItr;
 	PyObject* pItemItr;
 	PyObject* pItem;
@@ -190,12 +215,17 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 	while ((pTransItr = PyIter_Next(pTractsItr)) != nullptr)
 	{
+#ifdef WITH_SIG_TERM
+		if (sigAborted())
+			EXIT_INTERRUPT();
+#endif
+
 		pItemItr = PyObject_GetIter(pTransItr);
-		cleanupPyRefs({pTransItr});
+		cleanupPyRefs({ pTransItr });
 
 		if (!pItemItr)
 		{
-			cleanupPyRefs({pTractsItr});
+			cleanupPyRefs({ pTractsItr });
 			ERR_TYPE("transactions must be iterable");
 			return nullptr;
 		}
@@ -203,10 +233,15 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		Transaction tc;
 		while ((pItem = PyIter_Next(pItemItr)) != nullptr)
 		{
+#ifdef WITH_SIG_TERM
+			if (sigAborted())
+				EXIT_INTERRUPT();
+#endif
+
 			Py_hash_t h = PyObject_Hash(pItem);
 			if (h == -1)
 			{
-				cleanupPyRefs( {pItem, pItemItr, pTractsItr} );
+				cleanupPyRefs({ pItem, pItemItr, pTractsItr });
 				ERR_TYPE("items must be hashable");
 				return nullptr;
 			}
@@ -216,14 +251,14 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 			// TODO: For non 32-bit values this will result in problems
 			tc.push_back(static_cast<ItemC>(h));
 
-			cleanupPyRefs({pItem});
+			cleanupPyRefs({ pItem });
 		}
 
 		transactions.push_back(tc);
-		cleanupPyRefs({pItemItr});
+		cleanupPyRefs({ pItemItr });
 	}
 
-	cleanupPyRefs({pTractsItr});
+	cleanupPyRefs({ pTractsItr });
 
 	// ========= Load Transaction Database from Python END ========= //
 
@@ -231,27 +266,20 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 	try
 	{
-		FPGrowth fp(transactions, support, zmin, zmax);
+		FPGrowth fp(transactions, support, zmin, zmax, static_cast<ItemC>(winlen), maxc, minneu, threads);
 		const Pattern* pPattern = fp.Growth();
+		if (pPattern == nullptr) Py_RETURN_NONE;
+		LOG_INFO_EVAL << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
 
-		std::cout << "Memory Usage after FPGrowth: " << GetMemString() << std::endl;
-
-		std::vector<const PatternType*> processed;
-		PostProcessing(pPattern, transactions.size(), fp.GetItemCount(), zmin, winlen, fp.GetId2Item(), processed);
-
-		std::cout << "Memory Usage after Post Processiong: " << GetMemString() << std::endl;
-
-		ClosedDetection(fp.GetItemCount(), fp.GetId2Item(), processed, closed);
+		ClosedDetection(fp, pPattern, closed);
+		LOG_INFO_EVAL << "Memory Usage after Closed Detection: " << GetMemString() << std::endl;
 	}
-	catch(const FPGException& e)
+	catch (const FPGException& e)
 	{
-		sigAbort(0);
-		PyErr_SetInterrupt();
-		ERR_ABORT();
-		return nullptr;
+		EXIT_INTERRUPT();
 	}
 
-	std::cout << "Converting Pattern to Python List ... " << std::flush;
+	LOG_INFO_EVAL << "Converting Pattern to Python List ... " << std::flush;
 	Timer t;
 	t.Start();
 
@@ -263,33 +291,43 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 		for (auto [idx, pp] : enumerate(closed))
 		{
+#ifdef WITH_SIG_TERM
+			if (sigAborted())
+				EXIT_INTERRUPT();
+#endif
+
 			pyPatternWSupp = createPyTuple(2);
-			pyPattern = createPyTuple(pp.first.size());
+			pyPattern      = createPyTuple(pp.first.size());
 
 			for (auto [i, item] : enumerate(pp.first))
 			{
+#ifdef WITH_SIG_TERM
+				if (sigAborted())
+					EXIT_INTERRUPT();
+#endif
+
 				PyObject* pItem = hashMap[item];
 				Py_INCREF(pItem);
 				PyTuple_SET_ITEM(pyPattern, i, pItem);
 			}
 
-			PyTuple_SET_ITEM(pyPatternWSupp, 0, pyPattern); // Set Pattern
+			PyTuple_SET_ITEM(pyPatternWSupp, 0, pyPattern);              // Set Pattern
 			PyTuple_SET_ITEM(pyPatternWSupp, 1, long2PyLong(pp.second)); // Set Support
 
 			PyList_SET_ITEM(pyList, idx, pyPatternWSupp);
 		}
 
 		t.Stop();
-		std::cout << "Done after: " << t << std::endl;
-		std::cout << "Memory Usage after Conmversion: " << GetMemString() << std::endl;
+		LOG_INFO_EVAL << "Done after: " << t << std::endl;
+		LOG_INFO_EVAL << "Memory Usage after Conmversion: " << GetMemString() << std::endl;
 
 		fullTimer.Stop();
-		std::cout << " =========  FPGrowth C++ Module End (" << fullTimer << ")  ========= " << std::endl;
+		LOG_INFO_EVAL << " =========  FPGrowth C++ Module End (" << fullTimer << ")  ========= " << std::endl;
 
 		sigRemove();
 		return pyList;
 	}
-	catch(const ModuleException& e)
+	catch (const ModuleException& e)
 	{
 		ERR_MEM(e.what())
 		return nullptr;

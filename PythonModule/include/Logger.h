@@ -35,7 +35,8 @@ enum class  Verbosity
 	VB_VERBOSE = 1,
 	VB_INFO = 2,
 	VB_WARNING = 3,
-	VB_ERROR = 4
+	VB_ERROR = 4,
+	VB_NONE = 255
 };
 
 class Logger
@@ -82,11 +83,22 @@ static Logger g_info(Verbosity::VB_INFO);
 static Logger g_warning(Verbosity::VB_WARNING);
 static Logger g_error(Verbosity::VB_ERROR);
 
+#ifndef EVAL_MODE
 #define LOG_DEBUG g_debug
 #define LOG_VERBOSE g_verbose
 #define LOG_INFO g_info
 #define LOG_WARNING g_warning
 #define LOG_ERROR g_error
+#else
+static Logger g_none(Verbosity::VB_DEBUG, Verbosity::VB_NONE);
+#define LOG_DEBUG g_none
+#define LOG_VERBOSE g_none
+#define LOG_INFO g_none
+#define LOG_WARNING g_none
+#define LOG_ERROR g_none
+#endif
+
+#define LOG_INFO_EVAL g_info
 
 void SetVerbosity(Verbosity v)
 {
