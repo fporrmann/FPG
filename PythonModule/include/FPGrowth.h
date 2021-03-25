@@ -575,6 +575,9 @@ private:
 		for (int64_t i = end - 1; i >= start; i -= inc)
 #endif
 		{
+#ifdef _MSC_VER
+			if(error) continue;
+#endif
 #ifdef USE_OPENMP
 			int32_t tId = omp_get_thread_num();
 #else
@@ -601,7 +604,9 @@ private:
 					if (!growth(tId, i, ppDst[tId]))
 					{
 						error = true;
+#ifndef _MSC_VER
 						i     = end;
+#endif
 					}
 				}
 			}

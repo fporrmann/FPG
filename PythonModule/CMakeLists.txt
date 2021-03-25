@@ -16,8 +16,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if (WIN32)
-  # Windows library for memory utilization
-  find_library(PSAPI Psapi)
+  if (MSVC)
+	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+  else()
+	# Windows-GCC library for memory utilization
+	find_library(PSAPI Psapi)
+  endif()
 endif()
 
 if (USE_OPENMP)
@@ -50,6 +54,7 @@ if (WIN32)
   # Change the extension from .dll to .pyd on Windows
   set(CMAKE_SHARED_LIBRARY_SUFFIX ".pyd")
   target_link_libraries(${PROJECT_NAME} PUBLIC ${PSAPI})
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${PYTHON_LIBRARIES})
 endif()
 
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON) # enable fPIC
@@ -62,7 +67,6 @@ if (MPI_FOUND)
   target_link_libraries(${PROJECT_NAME} PRIVATE ${MPI_CXX_LIBRARIES})
 endif()
 
-target_link_libraries(${PROJECT_NAME} PUBLIC ${PYTHON_LIBRARIES})
 
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)

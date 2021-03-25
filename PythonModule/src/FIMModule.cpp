@@ -33,8 +33,8 @@
 #include <string>
 #ifndef _WIN32
 #include <sys/resource.h>
-#endif
 #include <unistd.h>
+#endif
 
 #include <Python.h>
 
@@ -77,11 +77,18 @@
 
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 4
-#define PATCH_VERSION 3
+#define PATCH_VERSION 4
 
 #define VERSION              \
 	TO_STRING(MAJOR_VERSION) \
 	"." TO_STRING(MINOR_VERSION) "." TO_STRING(PATCH_VERSION)
+
+#ifdef _MSC_VER
+#define GET_PID _getpid()
+#else
+#define GET_PID getpid()
+#endif
+
 
 DEFINE_EXCEPTION(ModuleException)
 
@@ -119,7 +126,8 @@ PyMODINIT_FUNC INIT_FUNC_NAME(MODULE_NAME)(void)
 {
 	Py_Initialize();
 	PyObject* pModule = PyModule_Create(&ModuleDefinitions);
-	PyModule_AddObject(pModule, "version", Py_BuildValue("s", "version 0.3-Alpha"));
+	PyModule_AddObject(pModule, "version", Py_BuildValue("s", VERSION));
+	PyModule_AddObject(pModule, "__version__", Py_BuildValue("s", VERSION));
 	return pModule;
 }
 
@@ -170,7 +178,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 	Support support = 0;
 	uint32_t zmin   = 1;
 	uint32_t zmax   = 0;
-	uint32_t maxc   = -1;
+	uint32_t maxc   = static_cast<uint32_t>(~0);
 	uint32_t minneu = 1;
 	char* report    = nullptr;
 	char* algo      = nullptr;
@@ -195,7 +203,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 
 	SetVerbosity(verbosity);
 
-	LOG_INFO << " =========  FPGrowth C++ Module (v" VERSION ") - Start - PID: " << getpid() << "  ========= " << std::endl;
+	LOG_INFO << " =========  FPGrowth C++ Module (v" VERSION ") - Start - PID: " <<	GET_PID << "  ========= " << std::endl;
 
 	sigInstall(); // Install signal handler to catch CTRL-C interrupts
 
@@ -274,7 +282,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 		ClosedDetection(fp, pPattern, closed);
 		LOG_INFO_EVAL << "Memory Usage after Closed Detection: " << GetMemString() << std::endl;
 	}
-	catch (const FPGException& e)
+	catch (const FPGException&)
 	{
 		EXIT_INTERRUPT();
 	}
@@ -306,7 +314,7 @@ PyObject* fpgrowth(PyObject* self, PyObject* args, PyObject* kwds)
 					EXIT_INTERRUPT();
 #endif
 
-				PyObject* pItem = hashMap[item];
+				pItem = hashMap[item];
 				Py_INCREF(pItem);
 				PyTuple_SET_ITEM(pyPattern, i, pItem);
 			}

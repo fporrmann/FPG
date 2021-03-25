@@ -35,7 +35,9 @@
 #include <exception>
 #include <iostream>
 #include <cmath>
+#ifndef _WIN32
 #include <unistd.h>
+#endif
 
 #define CLASS_TAG(_C_) "[" << _C_ << "::" << __func__ << "] "
 
