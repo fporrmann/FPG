@@ -18,6 +18,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (WIN32)
   if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+	set(CMAKE_CXX_FLAGS "/EHsc")
   else()
 	# Windows-GCC library for memory utilization
 	find_library(PSAPI Psapi)
