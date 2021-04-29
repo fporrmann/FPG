@@ -70,8 +70,7 @@ struct FPTree
 		pId2Item(pId2Item_g),
 		pMemory(pMem)
 	{
-		// Using malloc here because new calls the constructor for each object which costs a shit ton of time
-		pHeads = reinterpret_cast<FPHead*>(malloc(cnt * sizeof(FPHead)));
+		pHeads = new FPHead[cnt];
 	}
 
 	FPTree(const std::vector<RefPair>& F, uint32_t* pIdx2Id_g, ItemC* pId2Item_g, FPNMemory* pMem) :
@@ -82,8 +81,7 @@ struct FPTree
 		pId2Item(pId2Item_g),
 		pMemory(pMem)
 	{
-		// Using malloc here because new calls the constructor for each object which costs a shit ton of time
-		pHeads = reinterpret_cast<FPHead*>(malloc(cnt * sizeof(FPHead)));
+		pHeads = new FPHead[cnt];
 		uint32_t id = 0;
 		for (std::size_t idx = 0; idx < F.size(); idx++)
 		{
@@ -100,7 +98,7 @@ struct FPTree
 
 	~FPTree()
 	{
-		free(pHeads);
+		delete[] pHeads;
 	}
 
 	void Add(const TransactionC& trans, const Support& support)
