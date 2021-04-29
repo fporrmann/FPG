@@ -18,6 +18,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 if (WIN32)
   if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+	add_definitions(-D_UNICODE)
+	add_definitions(-DUNICODE)
 	set(CMAKE_CXX_FLAGS "/EHsc")
   else()
 	# Windows-GCC library for memory utilization

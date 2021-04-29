@@ -46,6 +46,7 @@
 
 #include <experimental/vector>
 
+#include "HeapAlloc.h"
 #include "Defines.h"
 #include "FPNode.h"
 #include "Logger.h"
