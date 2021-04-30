@@ -15,12 +15,36 @@ option(EVAL_MODE "Build the project in eval mode, disabling most printing" OFF)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+	set(COMPILER_NAME "Clang")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	if(WIN32)
+		set(COMPILER_NAME "MinGW")
+	else()
+		set(COMPILER_NAME "GCC")
+	endif()
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
+	set(COMPILER_NAME "Intel C++")
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+	set(COMPILER_NAME "Microsoft Visual Studio")
+else()
+	set(COMPILER_NAME CMAKE_CXX_COMPILER_ID)
+endif()
+
+add_definitions(-DCOMPILER_STR="${COMPILER_NAME}")
+
+
+# GCC flag to enable large address awareness, used to increase the amount of memory
+# usable by a 32-bit application
+set(LAA_FLAG "-Wl,--large-address-aware")
+
 if (WIN32)
   if (MSVC)
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 	add_definitions(-D_UNICODE)
 	add_definitions(-DUNICODE)
 	set(CMAKE_CXX_FLAGS "/EHsc")
+	set(LAA_FLAG "/LARGEADDRESSAWARE")
   else()
 	# Windows-GCC library for memory utilization
 	# find_library(PSAPI Psapi)
@@ -71,6 +95,14 @@ if (MPI_FOUND)
   target_link_libraries(${PROJECT_NAME} PRIVATE ${MPI_CXX_LIBRARIES})
 endif()
 
+# Set large address aware flag for 32-bit, this allows for up to 3GB of memory to be used
+# However, in most cases Python is not build in large address aware mode, meaning that once
+# 2GB of memory are used the application will terminate itself
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+	add_definitions(-DARCH_X86)
+	message(WARNING "Building a 32-bit application is discouraged as the maximum amount of usable memory is limited to 2GB")
+	target_link_options(${PROJECT_NAME} PRIVATE ${LAA_FLAG})
+endif()
 
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)

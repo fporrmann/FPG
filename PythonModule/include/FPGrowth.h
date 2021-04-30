@@ -430,7 +430,7 @@ private:
 		}
 	}
 
-	void pp(Pattern& results, const ItemID* pIDs, const std::size_t& size, const std::size_t& pos, const std::size_t& minLen, PatternType* pBase, PatternType basePos, const Support& supp, const ItemC* pId2Item, const Support& maxSupport, const std::size_t& minNeuronCount, const ItemC& winLen)
+	void pp(Pattern& results, const ItemID* pIDs, const std::size_t& size, const std::size_t& pos, const std::size_t& minLen, PatternType* pBase, std::size_t basePos, const Support& supp, const ItemC* pId2Item, const Support& maxSupport, const std::size_t& minNeuronCount, const ItemC& winLen)
 	{
 		pBase[basePos++] = m_pId2Item[pIDs[pos]];
 		for (std::size_t i = pos + 1; i < size; i++)
@@ -596,7 +596,7 @@ private:
 			}
 			else if (ppDst[tId])
 			{
-				if (project(tId, ppDst[tId], pTree, i))
+				if (project(tId, ppDst[tId], pTree, static_cast<std::size_t>(i)))
 				{
 					// Use boolean return because throwing exceptions
 					// in a multi-threaded setup results in forceful
@@ -737,7 +737,7 @@ private:
 			}
 			else if (pDst)
 			{
-				if (project(tId, pDst, pTree, i))
+				if (project(tId, pDst, pTree, static_cast<std::size_t>(i)))
 				{
 					if (!growth(tId, pId, pDst))
 						return false;
