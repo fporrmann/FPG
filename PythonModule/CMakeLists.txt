@@ -23,7 +23,8 @@ if (WIN32)
 	set(CMAKE_CXX_FLAGS "/EHsc")
   else()
 	# Windows-GCC library for memory utilization
-	find_library(PSAPI Psapi)
+	# find_library(PSAPI Psapi)
+	set(PSAPI Psapi)
   endif()
 endif()
 

@@ -26,7 +26,7 @@
 
 #pragma once
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 
 // In a multi-threaded environmet the Windows runtime library spends a lot of time waiting
 // when allocating memory as each thread uses the same heap. Therefore, by creating a dedicated
@@ -47,7 +47,7 @@ thread_local HANDLE g_tl_heapHandle;
 const char* lastSystemErrorText()
 {
 	static char err[BUFSIZ];
-	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPWSTR>(err), 255, NULL);
+	FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM, NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), reinterpret_cast<LPWSTR>(err), 255, NULL);
 	return err;
 }
 
@@ -93,28 +93,32 @@ inline void deleteImpl(void* ptr)
 
 	void* handlePtr = reinterpret_cast<void*>(((reinterpret_cast<char*>(ptr)) - sizeof(HANDLE)));
 	HANDLE handle = *(reinterpret_cast<HANDLE*>(handlePtr));
-	heapFree(handle, handlePtr);
+	if(handle)
+		heapFree(handle, handlePtr);
 }
 }
 
-// globally replacing operators new and delete
-void* operator new(std::size_t sz)
+class HeapAlloc
 {
-	return newImpl(sz);
-}
+	public:
+		void* operator new(std::size_t sz)
+		{
+			return newImpl(sz);
+		}
 
-void* operator new[](std::size_t sz)
-{
-	return newImpl(sz);
-}
+		void* operator new[](std::size_t sz)
+		{
+			return newImpl(sz);
+		}
 
-void operator delete(void* ptr) noexcept
-{
-	deleteImpl(ptr);
-}
+		void operator delete(void* ptr) noexcept
+		{
+			deleteImpl(ptr);
+		}
 
-void operator delete[](void* ptr) noexcept
-{
-	deleteImpl(ptr);
-}
+		void operator delete[](void* ptr) noexcept
+		{
+			deleteImpl(ptr);
+		}
+};
 #endif
