@@ -1,0 +1,26 @@
+# The 2 sessions to analyze
+sessions : ['i140703-001']
+# The 5 epochs to analyze
+epochs : ['movement']
+# The 4 trial types to analyze
+trialtypes : ['PGHF']
+# Absolute (independent of the number of spikes) minimum number of occurrences of a pattern
+abs_min_occ : 10
+# Minimum number of spikes
+abs_min_spikes : 2
+# The binsize to use to run the spade analysis in seconds
+binsize : 0.005
+# Percentile of Poisson pattern count to set minimum occ (int between 0 and 100)
+percentile_poiss : 95
+# the percentile of the rate distribution to use to compute min occ (int between 0 and 100)
+percentile_rates : 90
+# sliding window length
+winlen : 12
+# Unit in which every time of the analysis is expressed
+unit : 's'
+# Firing rate threshold to exclude neurons
+firing_rate_threshold : 70
+# SNR threshold for loading spiketrains
+SNR_thresh : 2.5
+# minimal size of synchronous artefacts to be removed in data loading
+synchsize : 2
