@@ -15,7 +15,7 @@ percentile_poiss : 95
 # the percentile of the rate distribution to use to compute min occ (int between 0 and 100)
 percentile_rates : 90
 # sliding window length
-winlen : 12
+winlen : 20
 # Unit in which every time of the analysis is expressed
 unit : 's'
 # Firing rate threshold to exclude neurons
