@@ -1,10 +1,10 @@
 import os
-
 import numpy as np
 import quantities as pq
 import yaml
 from yaml import Loader
 import rgutils
+import sys
 
 if __name__ == '__main__':
     with open("configfile.yaml", 'r') as stream:
@@ -33,6 +33,7 @@ if __name__ == '__main__':
                     SNRthresh=SNR_thresh,
                     synchsize=synchsize,
                     sep=sep)
+                # TODO: fix numpy deprecation warning
                 np.save(f'./data/{session}/'
                         f'spiketrains_{epoch}_{trialtype}.npy',
                         sts)

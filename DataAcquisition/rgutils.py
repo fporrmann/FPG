@@ -1,10 +1,13 @@
-import time
 import os
 import sys
 import numpy as np
 import quantities as pq
+sys.path.insert(0, './multielectrode_grasp/code/python-neo')
 import neo
+sys.path.insert(0, './multielectrode_grasp/code/python-odml')
+sys.path.insert(0, './multielectrode_grasp/code/reachgraspio')
 import reachgraspio as rgio
+sys.path.insert(0, './multielectrode_grasp/code')
 from neo_utils import add_epoch, cut_segment_by_epoch, get_events
 from elephant import spike_train_synchrony
 
@@ -80,6 +83,7 @@ def _session(session_name):
     path_odml = odml_path(session_name)
     session = rgio.ReachGraspIO(path + session_name, odml_directory=path_odml)
     return session
+
 
 def st_id(spiketrain):
     """
@@ -300,8 +304,9 @@ def load_epoch_as_lists(session_name, epoch, trialtypes=None, SNRthresh=0,
     data_segment = block.segments[0]
     start_events = get_events(
         data_segment,
-        performance_in_trial_str='correct_trial',
-        trial_event_labels=trigger)
+        properties={
+            'trial_event_labels': trigger,
+            'performance_in_trial': session.performance_codes['correct_trial']})
     start_event = start_events[0]
     epoch = add_epoch(
         data_segment,
@@ -458,11 +463,11 @@ def load_epoch_concatenated_trials(
         conc_data.append(st)
     # Remove exactly synchronous spikes from data
     if not (synchsize == 0 or synchsize is None):
-
         sampling_rate = 30000 * pq.Hz
         obj = spike_train_synchrony.Synchrotool(conc_data,
                                                 sampling_rate=sampling_rate,
-                                                spread=dt)
+                                                spread=dt,
+                                                tolerance=None)
         obj.delete_synchrofacts(threshold=synchsize, in_place=True)
         sts = obj.input_spiketrains
         for i in range(len(conc_data)):

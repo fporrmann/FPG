@@ -59,6 +59,6 @@ if __name__ == '__main__':
     fim_input = generate_input(data=sts,
                                binsize=binsize,
                                winlen=winlen)
-
+    # TODO: fix numpy deprecation warning
     np.save(f'./data/{dataset}/{epoch}_{trialtype}.npy', fim_input)
     # TODO: step to get to the txt file is missing (ask FP)

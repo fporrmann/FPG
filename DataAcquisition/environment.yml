@@ -19,5 +19,3 @@ dependencies:
       - tqdm
       - odml
       - scipy
-      - ' -e git+ssh://git@github.com/inm-6/reach_to_grasp.git@master#
-      egg=r2gtools&subdirectory=python'
