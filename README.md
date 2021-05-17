@@ -47,3 +47,22 @@ Build the Python module as described in the [installation](#installation) sectio
 |      4 | 22.32s     | 300     | cfg/test_300n.json      |
 |      5 | 22.32s     | 450     | cfg/test_450n.json      |
 
+## Data Acquisition ##
+The electrophysiological data is imported via [GIN](https://gin.g-node.org/)
+as a submodule. A GIN account is necessary to download the data.
+
+**Requirements / Python-Modules**
+
+```
+# create the conda environment
+cd DataAcquisition
+conda env create -f environment.yml
+conda activate fpg
+```
+
+**Create data for evaluation**
+
+```
+# run data download, preprocess and save workflow
+./preprocess_data.sh
+```
