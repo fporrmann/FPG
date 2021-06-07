@@ -1,10 +1,8 @@
 cd multielectrode_grasp
 git submodule update --init
 cd ..
-mkdir data
-cd data
-mkdir i140703-001
-cd i140703-001
+mkdir -p data/i140703-001
+cd data/i140703-001
 wget https://gin.g-node.org/INT/multielectrode_grasp/raw/master/datasets/i140703-001-03.nev
 wget https://gin.g-node.org/INT/multielectrode_grasp/raw/master/datasets/i140703-001.odml
 cd ../..
