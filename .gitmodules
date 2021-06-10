@@ -1,0 +1,3 @@
+[submodule "DataAcquisition/multielectrode_grasp"]
+	path = DataAcquisition/multielectrode_grasp
+	url = git@gin.g-node.org:/INT/multielectrode_grasp.git

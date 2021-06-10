@@ -1,0 +1,21 @@
+name: fpg
+channels:
+  - defaults
+  - bioconda
+  - conda-forge
+dependencies:
+  - lxml
+  - numpy
+  - pip
+  - pip:
+      - quantities
+      - elephant
+      - rdflib
+      - ipython
+      - PyYAML
+      - neo
+      - ipykernel
+      - mpi4py
+      - tqdm
+      - odml
+      - scipy
