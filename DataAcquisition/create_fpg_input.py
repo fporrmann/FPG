@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     # SPADE parameters
     winlen = config['winlen']
-    binsize = config['binsize'] * pq.ms
+    binsize = config['binsize'] * pq.s
     dataset = config['sessions'][0]
     epoch = config['epochs'][0]
     trialtype = config['trialtypes'][0]
@@ -61,4 +61,10 @@ if __name__ == '__main__':
                                winlen=winlen)
     # TODO: fix numpy deprecation warning
     np.save(f'./data/{dataset}/{epoch}_{trialtype}.npy', fim_input)
-    # TODO: step to get to the txt file is missing (ask FP)
+
+    f = open(f'./data/{dataset}/{epoch}_{trialtype}.txt', "w")
+    for i in fim_input:
+        np.savetxt(f, i, fmt="%d", delimiter=" ", newline=" ")
+        f.write("\n")
+    f.close()
+
