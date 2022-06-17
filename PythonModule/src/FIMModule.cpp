@@ -77,7 +77,7 @@
 
 #define MAJOR_VERSION 0
 #define MINOR_VERSION 4
-#define PATCH_VERSION 7
+#define PATCH_VERSION 8
 
 #define VERSION              \
 	TO_STRING(MAJOR_VERSION) \
